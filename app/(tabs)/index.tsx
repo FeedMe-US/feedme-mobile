@@ -1,0 +1,933 @@
+/**
+ * Home Screen - Main meal planning interface
+ * Matches SwiftUI design from screenshots
+ */
+
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Chip } from '@/src/components/Chip';
+import { MacroRing } from '@/src/components/MacroRing';
+import { MealCard } from '@/src/components/MealCard';
+import { locationService } from '@/src/services/locationService';
+import { MealRecommendation, mealService, MealPeriod } from '@/src/services/mealService';
+import { useDailyTracking } from '@/src/store/DailyTrackingContext';
+import { colors, spacing, radius } from '@/src/theme';
+import { Card } from '@/src/ui/Card';
+import { Screen } from '@/src/ui/Screen';
+import { Text } from '@/src/ui/Text';
+import { Button } from '@/src/ui/Button';
+import { haptics } from '@/src/utils/haptics';
+import { formatCalories, formatMacro } from '@/src/utils/formatNutrition';
+import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, TextInput, ActivityIndicator } from 'react-native';
+import { userService } from '@/src/services/userService';
+import { getOnboardingData } from '@/src/lib/onboardingData';
+import type { DiningHall } from '@/src/services/mealService';
+
+export default function HomeScreen() {
+  const colorScheme = useColorScheme();
+  const themeColors = colors[colorScheme ?? 'light']; // Default to light for Neumorphism
+  const router = useRouter();
+  const { tracking, addMeal } = useDailyTracking();
+
+  // Hall selection state - default to "Any Hill" mode so content shows on scroll
+  const [selectedHallSlug, setSelectedHallSlug] = useState<string | null>(null);
+  const [selectedHallMode, setSelectedHallMode] = useState<'specific' | 'hill' | 'campus'>('hill');
+  const [diningHalls, setDiningHalls] = useState<string[]>([]);
+  const [diningHallsData, setDiningHallsData] = useState<Map<string, { isOpen: boolean; availablePeriods?: string[] }>>(new Map());
+
+  // Meal period and mood selection
+  const [selectedMealPeriod, setSelectedMealPeriod] = useState<MealPeriod | null>(null);
+  const [moodText, setMoodText] = useState<string>('');
+
+  // Generation state
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [recommendedMeal, setRecommendedMeal] = useState<MealRecommendation | null>(null);
+
+  const [likedMeals, setLikedMeals] = useState<Set<string>>(new Set());
+  const [greeting, setGreeting] = useState('Good Evening');
+  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollPositionRef = useRef<number>(0);
+  const hasLoadedOnce = useRef(false);
+
+  // Mood suggestion chips
+  const moodSuggestions = ['High protein', 'Light meal', 'Comfort food', 'Spicy'];
+
+  // Set greeting based on time
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting('Good Morning');
+    else if (hour < 17) setGreeting('Good Afternoon');
+    else setGreeting('Good Evening');
+  }, []);
+
+  // Get available periods for the current selection
+  const getAvailablePeriods = useCallback((): MealPeriod[] => {
+    if (selectedHallMode === 'hill' || selectedHallMode === 'campus') {
+      // For "Any Hill" or "Any Campus", show all periods
+      return ['breakfast', 'lunch', 'dinner', 'late_night'];
+    }
+    if (selectedHallSlug) {
+      const hallData = diningHallsData.get(selectedHallSlug);
+      if (hallData?.availablePeriods && hallData.availablePeriods.length > 0) {
+        return hallData.availablePeriods as MealPeriod[];
+      }
+    }
+    // Default to all periods
+    return ['breakfast', 'lunch', 'dinner', 'late_night'];
+  }, [selectedHallMode, selectedHallSlug, diningHallsData]);
+
+  // Get current/next meal period based on time
+  const getCurrentMealPeriod = useCallback((): MealPeriod => {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      hour: '2-digit',
+      hour12: false,
+    });
+    const hour = parseInt(formatter.formatToParts(new Date()).find(p => p.type === 'hour')?.value || '12', 10);
+    if (hour >= 5 && hour < 11) return 'breakfast';
+    if (hour >= 11 && hour < 16) return 'lunch';
+    if (hour >= 16 && hour < 21) return 'dinner';
+    return 'late_night';
+  }, []);
+
+  // Handle generate button press
+  const handleGenerate = async () => {
+    if (!selectedMealPeriod) return;
+    if (selectedHallMode === 'specific' && !selectedHallSlug) return;
+
+    setIsGenerating(true);
+    try {
+      const result = await mealService.getRecommendedMealWithOptions(
+        selectedHallSlug,
+        selectedMealPeriod,
+        {
+          mood: moodText || undefined,
+          mode: selectedHallMode,
+        }
+      );
+      setRecommendedMeal(result);
+      haptics.success();
+    } catch (error) {
+      console.error('Failed to generate recommendation:', error);
+      Alert.alert('Error', 'Failed to generate recommendation. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Handle mood chip tap
+  const handleMoodChipTap = (suggestion: string) => {
+    haptics.selection();
+    if (moodText.includes(suggestion)) {
+      // Remove the suggestion if already present
+      setMoodText(prev => {
+        const parts = prev.split(', ').filter(p => p !== suggestion);
+        return parts.join(', ');
+      });
+    } else {
+      // Add the suggestion
+      setMoodText(prev => prev ? `${prev}, ${suggestion}` : suggestion);
+    }
+  };
+
+// Load dining halls on mount and when screen gains focus (to pick up profile changes)
+// Using useFocusEffect to reload when returning from profile screen
+useFocusEffect(
+  useCallback(() => {
+    const loadDiningHalls = async () => {
+    try {
+      // Get all dining halls from the API
+      const allHalls = await mealService.getDiningHalls();
+      console.log('[Home] Loaded', allHalls.length, 'dining halls from API');
+
+      // Get preferred halls from backend (if authenticated) or local onboarding data
+      let preferredSlugs: string[] = [];
+      
+      try {
+        // Try to get from backend first if authenticated
+        const profile = await userService.getProfile();
+        if (profile?.preferred_locations?.length) {
+          // Map location IDs to slugs
+          const locationIdToSlug: Record<number, string> = {
+            // Residential dining
+            28: 'de-neve-dining',
+            29: 'bruin-plate',
+            30: 'spice-kitchen',
+            31: 'epicuria-at-covel',
+            // Hill / campus restaurants
+            34: 'bruin-cafe',
+            35: 'bruin-bowl',
+            36: 'cafe-1919',
+            37: 'the-study-at-hedrick',
+            38: 'the-drey',
+            39: 'rendezvous',
+            41: 'epicuria-at-ackerman',
+            // ASUCLA / LuValle / satellite locations
+            100: 'anderson-cafe',
+            101: 'bombshelter',
+            102: 'luvalle-fusion',
+            103: 'luvalle-pizza',
+            104: 'luvalle-epazote',
+            105: 'luvalle-burger',
+            106: 'luvalle-poke',
+            107: 'luvalle-panini',
+            108: 'synapse',
+          };
+          preferredSlugs = profile.preferred_locations
+            .map(id => locationIdToSlug[id])
+            .filter(slug => slug !== undefined);
+        }
+        
+        // Fall back to local onboarding data if no backend data
+        if (preferredSlugs.length === 0) {
+          const onboardingData = await getOnboardingData();
+          preferredSlugs = onboardingData.preferredDiningLocations || [];
+        }
+      } catch (error) {
+        console.warn('[Home] Error loading preferred halls, using local data:', error);
+        const onboardingData = await getOnboardingData();
+        preferredSlugs = onboardingData.preferredDiningLocations || [];
+      }
+
+      // Normalize slugs (map b-plate to bruin-plate, etc.)
+      preferredSlugs = preferredSlugs.map(slug => {
+        if (slug === 'b-plate') return 'bruin-plate';
+        if (slug === 'de-neve') return 'de-neve-dining';
+        if (slug === 'epicuria') return 'epicuria-at-covel';
+        if (slug === 'the-study') return 'the-study-at-hedrick';
+        if (slug === 'feast') return 'spice-kitchen';
+        return slug;
+      });
+
+      // Deduplicate preferred slugs after normalization to avoid duplicates
+      preferredSlugs = Array.from(new Set(preferredSlugs));
+
+      // Create a complete mapping of all possible dining halls (fallback data)
+      const allPossibleHalls: DiningHall[] = [
+        // Residential dining
+        { id: 29, name: 'Bruin Plate', slug: 'bruin-plate', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false },
+        { id: 28, name: 'De Neve Dining', slug: 'de-neve-dining', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false },
+        { id: 31, name: 'Epicuria at Covel', slug: 'epicuria-at-covel', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false },
+        { id: 30, name: 'Feast at Rieber', slug: 'spice-kitchen', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
+        // Hill / campus restaurants
+        { id: 39, name: 'Rendezvous', slug: 'rendezvous', type: 'boutique', is_residential: false, campus_area: 'South', is_open_now: false },
+        { id: 37, name: 'The Study at Hedrick', slug: 'the-study-at-hedrick', type: 'boutique', is_residential: false, campus_area: 'Central', is_open_now: false },
+        { id: 38, name: 'The Drey', slug: 'the-drey', type: 'boutique', is_residential: false, campus_area: 'North', is_open_now: false },
+        { id: 35, name: 'Bruin Bowl', slug: 'bruin-bowl', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
+        { id: 34, name: 'Bruin Cafe', slug: 'bruin-cafe', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
+        { id: 36, name: 'Cafe 1919', slug: 'cafe-1919', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
+        { id: 41, name: 'Epicuria at Ackerman', slug: 'epicuria-at-ackerman', type: 'boutique', is_residential: false, campus_area: 'Central', is_open_now: false },
+        // ASUCLA / LuValle / satellite locations
+        { id: 100, name: 'Anderson Café', slug: 'anderson-cafe', type: 'boutique', is_residential: false, campus_area: 'North Campus', is_open_now: false },
+        { id: 101, name: 'Court of Sciences: Bombshelter', slug: 'bombshelter', type: 'boutique', is_residential: false, campus_area: 'South Campus', is_open_now: false },
+        { id: 102, name: 'LuValle: Fusion', slug: 'luvalle-fusion', type: 'boutique', is_residential: false, campus_area: 'Central Campus', is_open_now: false },
+        { id: 103, name: 'LuValle: All Rise Pizza', slug: 'luvalle-pizza', type: 'boutique', is_residential: false, campus_area: 'Central Campus', is_open_now: false },
+        { id: 104, name: 'LuValle: Epazote', slug: 'luvalle-epazote', type: 'boutique', is_residential: false, campus_area: 'Central Campus', is_open_now: false },
+        { id: 105, name: 'LuValle: Burger Assemble', slug: 'luvalle-burger', type: 'boutique', is_residential: false, campus_area: 'Central Campus', is_open_now: false },
+        { id: 106, name: 'LuValle: Northern Lights Poke', slug: 'luvalle-poke', type: 'boutique', is_residential: false, campus_area: 'Central Campus', is_open_now: false },
+        { id: 107, name: 'LuValle: Northern Lights Panini', slug: 'luvalle-panini', type: 'boutique', is_residential: false, campus_area: 'Central Campus', is_open_now: false },
+        { id: 108, name: 'Synapse', slug: 'synapse', type: 'boutique', is_residential: false, campus_area: 'South Campus', is_open_now: false },
+      ];
+
+      // Merge API data with fallback data (API data takes precedence for open status)
+      const hallsMap = new Map<string, DiningHall>();
+      allPossibleHalls.forEach(hall => hallsMap.set(hall.slug, { ...hall }));
+      allHalls.forEach(hall => {
+        const existing = hallsMap.get(hall.slug);
+        if (existing) {
+          // Update with API data (especially is_open_now)
+          hallsMap.set(hall.slug, { ...existing, ...hall });
+        } else {
+          // Add new hall from API
+          hallsMap.set(hall.slug, hall);
+        }
+      });
+      const mergedHalls = Array.from(hallsMap.values());
+
+      // Get preferred halls (even if closed) - use merged data to ensure all preferred halls are included
+      const preferredHalls = preferredSlugs
+        .map(slug => mergedHalls.find(h => h.slug === slug))
+        .filter((hall): hall is DiningHall => hall !== undefined);
+      
+      // If a preferred hall is missing, create a fallback entry
+      preferredSlugs.forEach(slug => {
+        if (!preferredHalls.find(h => h.slug === slug)) {
+          const fallbackHall = allPossibleHalls.find(h => h.slug === slug);
+          if (fallbackHall) {
+            preferredHalls.push(fallbackHall);
+          }
+        }
+      });
+
+      const openHalls = mergedHalls.filter(h => h.is_open_now && !preferredSlugs.includes(h.slug));
+
+      // Combine: preferred halls first (open preferred first, then closed preferred), then other open halls
+      const sortedHalls = [
+        ...preferredHalls.filter(h => h.is_open_now),
+        ...preferredHalls.filter(h => !h.is_open_now),
+        ...openHalls,
+      ].sort((a, b) => {
+        // Within each group, sort alphabetically
+        return a.name.localeCompare(b.name);
+      });
+
+      // Get slugs for all halls to show (deduplicated to ensure unique React keys)
+      const hallSlugs = Array.from(new Set(sortedHalls.map(h => h.slug)));
+
+      // Store open/closed status and available periods for each hall (use merged data)
+      const hallsDataMap = new Map<string, { isOpen: boolean; availablePeriods?: string[] }>();
+      mergedHalls.forEach(hall => {
+        hallsDataMap.set(hall.slug, {
+          isOpen: hall.is_open_now || false,
+          availablePeriods: hall.available_periods || ['breakfast', 'lunch', 'dinner', 'late_night'],
+        });
+      });
+      setDiningHallsData(hallsDataMap);
+
+      setDiningHalls(hallSlugs);
+      // Don't auto-select a hall - user must explicitly choose
+    } catch (error) {
+      console.error('Error loading dining halls:', error);
+      // Fallback to all known halls
+      setDiningHalls([
+        'bruin-plate', 'de-neve-dining', 'epicuria-at-covel',
+        'spice-kitchen', 'rendezvous', 'the-study-at-hedrick',
+        'the-drey', 'bruin-bowl', 'bruin-cafe', 'cafe-1919'
+      ]);
+    }
+  };
+  loadDiningHalls();
+  }, [])
+);
+
+  // Determine meal type based on time of day
+  const getMealType = (): 'breakfast' | 'lunch' | 'dinner' | 'snack' => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 11) return 'breakfast';
+    if (hour >= 11 && hour < 17) return 'lunch';
+    if (hour >= 17 && hour < 22) return 'dinner';
+    return 'snack';
+  };
+
+  const handleLogAll = () => {
+    if (!recommendedMeal) {
+      console.warn('[Home] handleLogAll: No recommended meal available');
+      return;
+    }
+
+    if (!recommendedMeal.mealItems || recommendedMeal.mealItems.length === 0) {
+      console.warn('[Home] handleLogAll: Meal has no items');
+      Alert.alert('No Items', 'This meal has no items to log.');
+      return;
+    }
+
+    haptics.success();
+
+    const mealType = getMealType();
+    const itemCount = recommendedMeal.mealItems.length;
+    let loggedCount = 0;
+    let totalCaloriesLogged = 0;
+
+    // Add each item as a separate meal entry
+    // Use per-item nutrition if available, otherwise fall back to averaged
+    recommendedMeal.mealItems.forEach((item) => {
+      try {
+        const itemCalories = item.calories ?? Math.round(recommendedMeal.calories / itemCount);
+        const itemProtein = item.protein ?? Math.round(recommendedMeal.protein / itemCount);
+        const itemCarbs = item.carbs ?? Math.round(recommendedMeal.carbs / itemCount);
+        const itemFat = item.fat ?? Math.round(recommendedMeal.fat / itemCount);
+
+        // Validate nutrition values are reasonable
+        if (itemCalories < 0 || itemProtein < 0 || itemCarbs < 0 || itemFat < 0) {
+          console.warn('[Home] handleLogAll: Invalid nutrition for item:', item.name);
+          return;
+        }
+
+        addMeal({
+          name: item.name,
+          mealType: mealType,
+          calories: itemCalories,
+          protein: itemProtein,
+          carbs: itemCarbs,
+          fats: itemFat,
+          quantity: 1,
+        });
+
+        loggedCount++;
+        totalCaloriesLogged += itemCalories;
+      } catch (error) {
+        console.error('[Home] handleLogAll: Error logging item:', item.name, error);
+      }
+    });
+
+    // Log summary for debugging
+    console.log(`[Home] handleLogAll: Logged ${loggedCount}/${itemCount} items, ${totalCaloriesLogged} total calories`);
+
+    // Show feedback if some items failed
+    if (loggedCount < itemCount) {
+      Alert.alert(
+        'Partial Log',
+        `Logged ${loggedCount} of ${itemCount} items. Some items could not be logged.`
+      );
+    }
+    // Otherwise, confirmation is handled by progress ring animation
+  };
+
+  const handleSwipeLeft = () => {
+    handleLogAll();
+  };
+
+  const handleSwipeRight = () => {
+    haptics.medium();
+    router.push('/manual-log');
+  };
+
+  const handleRefresh = () => {
+    haptics.medium();
+    handleGenerate();
+  };
+
+  const handleRingPress = () => {
+    router.push('/progress');
+  };
+
+  const handleRingLongPress = () => {
+    haptics.heavy();
+    // TODO: Open macro logging modal
+    Alert.alert('Macro Logging', 'Macro logging feature coming soon');
+  };
+
+  return (
+    <Screen safeBottom={false}>
+      <View style={styles.container}>
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          bounces={true}
+          onScroll={(event) => {
+            scrollPositionRef.current = event.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={16}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text variant="h2" weight="bold" style={styles.headerTitle}>
+              Let&apos;s plan your next meal
+            </Text>
+            <Text variant="h3" weight="semibold" style={styles.greeting}>
+              {greeting}
+            </Text>
+          </View>
+        </View>
+
+        {/* Daily Snapshot Card */}
+        <Card
+          variant="elevated"
+          padding="lg"
+          style={styles.snapshotCard}>
+          <View style={styles.snapshotHeader}>
+            <Text variant="h4" weight="semibold">
+              Daily Snapshot
+            </Text>
+            <TouchableOpacity onPress={() => router.push('/progress')}>
+              <Text variant="bodySmall" color="primary">
+                View details →
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            onPress={handleRingPress}
+            onLongPress={handleRingLongPress}
+            activeOpacity={0.8}
+            style={styles.ringContainer}>
+            <MacroRing
+              value={tracking.consumed.calories}
+              max={tracking.targets.calories}
+              size={180}
+              strokeWidth={20}
+              color={themeColors.calories}
+              unit="kcal today"
+            />
+          </TouchableOpacity>
+
+          <View style={styles.macroBreakdown}>
+            <View style={styles.macroItem}>
+              <Text
+                variant="body"
+                weight="semibold"
+                style={{ color: themeColors.protein }}>
+                {formatMacro(tracking.consumed.protein)} g
+              </Text>
+              <Text variant="caption" color="secondary">
+                Protein
+              </Text>
+            </View>
+            <View style={styles.macroItem}>
+              <Text
+                variant="body"
+                weight="semibold"
+                style={{ color: themeColors.carbs }}>
+                {formatMacro(tracking.consumed.carbs)} g
+              </Text>
+              <Text variant="caption" color="secondary">
+                Carbs
+              </Text>
+            </View>
+            <View style={styles.macroItem}>
+              <Text
+                variant="body"
+                weight="semibold"
+                style={{ color: themeColors.fats }}>
+                {formatMacro(tracking.consumed.fats)} g
+              </Text>
+              <Text variant="caption" color="secondary">
+                Fat
+              </Text>
+            </View>
+          </View>
+        </Card>
+
+        {/* Dining Hall Selector */}
+        {diningHalls.length > 0 ? (
+          <View style={styles.diningHallSection}>
+            {/* Show message if all dining halls are closed */}
+            {(() => {
+              const hasOpenHalls = Array.from(diningHallsData.values()).some(hall => hall.isOpen);
+              if (!hasOpenHalls && diningHalls.length > 0) {
+                return (
+                  <Card variant="elevated" padding="md" style={styles.closedMessageCard}>
+                    <Text variant="body" color="secondary" style={styles.closedMessageText}>
+                      Dining halls are closed right now. Recommendations will use placeholder data until they reopen.
+                    </Text>
+                  </Card>
+                );
+              }
+              return null;
+            })()}
+            <View style={styles.diningHallLabel}>
+              <Text variant="h4" weight="semibold">
+                Where are you eating?
+              </Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.diningHallChips}>
+              {/* Special mode chips first */}
+              <Chip
+                key="any-hill"
+                label="Any Hill"
+                selected={selectedHallMode === 'hill'}
+                onPress={() => {
+                  haptics.light();
+                  setSelectedHallMode('hill');
+                  setSelectedHallSlug(null);
+                  setSelectedMealPeriod(getCurrentMealPeriod());
+                  setRecommendedMeal(null);
+                }}
+                style={styles.diningHallChip}
+              />
+              <Chip
+                key="any-campus"
+                label="Any Campus"
+                selected={selectedHallMode === 'campus'}
+                onPress={() => {
+                  haptics.light();
+                  setSelectedHallMode('campus');
+                  setSelectedHallSlug(null);
+                  setSelectedMealPeriod(getCurrentMealPeriod());
+                  setRecommendedMeal(null);
+                }}
+                style={styles.diningHallChip}
+              />
+              {/* Regular hall chips */}
+              {diningHalls.map((hallSlug) => {
+                // Map slugs to proper display names
+              const hallNameMap: Record<string, string> = {
+                // Residential dining
+                'bruin-plate': 'Bruin Plate',
+                'b-plate': 'BPlate',
+                'de-neve-dining': 'De Neve Dining',
+                'de-neve': 'De Neve Dining',
+                'epicuria-at-covel': 'Epicuria at Covel',
+                'epicuria': 'Epicuria at Covel',
+                'spice-kitchen': 'Feast',
+                'feast': 'Feast',
+                // Hill / campus restaurants
+                'rendezvous': 'Rendezvous',
+                'the-study-at-hedrick': 'The Study',
+                'the-study': 'The Study',
+                'the-drey': 'The Drey',
+                'bruin-bowl': 'Bruin Bowl',
+                'bruin-cafe': 'Bruin Cafe',
+                'cafe-1919': 'Cafe 1919',
+                'epicuria-at-ackerman': 'Epicuria at Ackerman',
+                // ASUCLA / LuValle / satellite locations
+                'anderson-cafe': 'Anderson Café',
+                'bombshelter': 'Court of Sciences: Bombshelter',
+                'luvalle-fusion': 'LuValle: Fusion',
+                'luvalle-pizza': 'LuValle: All Rise Pizza',
+                'luvalle-epazote': 'LuValle: Epazote',
+                'luvalle-burger': 'LuValle: Burger Assemble',
+                'luvalle-poke': 'LuValle: Northern Lights Poke',
+                'luvalle-panini': 'LuValle: Northern Lights Panini',
+                'synapse': 'Synapse',
+              };
+                const hallName = hallNameMap[hallSlug] || hallSlug
+                  .split('-')
+                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                  .join(' ');
+                const isOpen = diningHallsData.get(hallSlug)?.isOpen ?? true;
+                const chipStyle = !isOpen
+                  ? { ...styles.diningHallChip, opacity: 0.6 }
+                  : styles.diningHallChip;
+                return (
+                  <Chip
+                    key={hallSlug}
+                    label={hallName + (isOpen ? '' : ' (Closed)')}
+                    selected={selectedHallMode === 'specific' && selectedHallSlug === hallSlug}
+                    onPress={() => {
+                      haptics.light();
+                      setSelectedHallMode('specific');
+                      setSelectedHallSlug(hallSlug);
+                      setSelectedMealPeriod(getCurrentMealPeriod());
+                      setRecommendedMeal(null);
+                    }}
+                    style={chipStyle}
+                  />
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : (
+          <Card variant="elevated" padding="lg" style={styles.closedCard}>
+            <Text variant="h4" weight="semibold" style={styles.closedTitle}>
+              All dining halls are closed
+            </Text>
+            <Text variant="body" color="secondary">
+              Check back during regular dining hours for meal recommendations
+            </Text>
+          </Card>
+        )}
+
+        {/* Meal Period Selector - only show after hall is selected */}
+        {(selectedHallSlug || selectedHallMode !== 'specific') && (
+          <View style={styles.mealPeriodSection}>
+            <View style={styles.sectionLabel}>
+              <Text variant="h4" weight="semibold">
+                Meal Period
+              </Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.mealPeriodChips}>
+              {getAvailablePeriods().map((period) => {
+                const periodLabels: Record<MealPeriod, string> = {
+                  breakfast: 'Breakfast',
+                  lunch: 'Lunch',
+                  dinner: 'Dinner',
+                  late_night: 'Late Night',
+                };
+                return (
+                  <Chip
+                    key={period}
+                    label={periodLabels[period]}
+                    selected={selectedMealPeriod === period}
+                    onPress={() => {
+                      haptics.selection();
+                      setSelectedMealPeriod(period);
+                    }}
+                    style={styles.mealPeriodChip}
+                  />
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Mood Input Section - only show after meal period is selected */}
+        {selectedMealPeriod && (
+          <View style={styles.moodSection}>
+            <View style={styles.sectionLabel}>
+              <Text variant="h4" weight="semibold">
+                What are you craving?
+              </Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.moodChips}>
+              {moodSuggestions.map((suggestion) => (
+                <Chip
+                  key={suggestion}
+                  label={suggestion}
+                  selected={moodText.includes(suggestion)}
+                  onPress={() => handleMoodChipTap(suggestion)}
+                  style={styles.moodChip}
+                />
+              ))}
+            </ScrollView>
+            <View style={styles.moodInputContainer}>
+              <TextInput
+                style={[
+                  styles.moodInput,
+                  {
+                    backgroundColor: themeColors.surface,
+                    color: themeColors.text,
+                    borderColor: themeColors.border,
+                  }
+                ]}
+                placeholder="What are you craving? (optional)"
+                placeholderTextColor={themeColors.textTertiary}
+                value={moodText}
+                onChangeText={setMoodText}
+                multiline={false}
+              />
+              {moodText.length > 0 && (
+                <TouchableOpacity
+                  style={styles.clearButton}
+                  onPress={() => {
+                    haptics.light();
+                    setMoodText('');
+                  }}>
+                  <Text variant="bodySmall" color="secondary">Clear</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Generate Button - only show after meal period is selected */}
+        {selectedMealPeriod && (
+          <View style={styles.generateSection}>
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={isGenerating}
+              disabled={!selectedMealPeriod || (selectedHallMode === 'specific' && !selectedHallSlug)}
+              onPress={handleGenerate}>
+              Generate Recommendation
+            </Button>
+          </View>
+        )}
+
+        {/* Recommended Meal Card - only show after recommendation is generated */}
+        {recommendedMeal && (
+          <MealCard
+            diningHall={recommendedMeal.diningHall}
+            mealItems={recommendedMeal.mealItems}
+            calories={recommendedMeal.calories}
+            protein={recommendedMeal.protein}
+            carbs={recommendedMeal.carbs}
+            fat={recommendedMeal.fat}
+            onLogAll={handleLogAll}
+            onSelectItems={() => {
+              haptics.medium();
+              router.push({
+                pathname: '/select-items',
+                params: {
+                  items: JSON.stringify(
+                    recommendedMeal.mealItems.map((item) => ({
+                      name: item.name,
+                      amount: item.amount,
+                      recipe_id: item.recipe_id,
+                      // Use per-item nutrition if available, fallback to averaged
+                      calories: item.calories ?? Math.round(recommendedMeal.calories / recommendedMeal.mealItems.length),
+                      protein: item.protein ?? Math.round(recommendedMeal.protein / recommendedMeal.mealItems.length),
+                      carbs: item.carbs ?? Math.round(recommendedMeal.carbs / recommendedMeal.mealItems.length),
+                      fat: item.fat ?? Math.round(recommendedMeal.fat / recommendedMeal.mealItems.length),
+                    }))
+                  ),
+                },
+              });
+            }}
+            onSwipeLeft={handleSwipeLeft}
+            onSwipeRight={handleSwipeRight}
+            onRefresh={handleRefresh}
+            onLike={() => {
+              if (recommendedMeal) {
+                const mealId = `${recommendedMeal.diningHall}-${recommendedMeal.calories}`;
+                setLikedMeals((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(mealId)) {
+                    next.delete(mealId);
+                  } else {
+                    next.add(mealId);
+                  }
+                  return next;
+                });
+              }
+            }}
+            isLiked={recommendedMeal ? likedMeals.has(`${recommendedMeal.diningHall}-${recommendedMeal.calories}`) : false}
+          />
+        )}
+      </ScrollView>
+      </View>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl, // Extra padding for card shadows and tab bar clearance
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.xl,
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerTitle: {
+    marginBottom: spacing.xs,
+  },
+  greeting: {
+    opacity: 0.8,
+  },
+  diningHallSection: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  diningHallLabel: {
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  diningHallChips: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  diningHallChip: {
+    marginRight: spacing.sm,
+  },
+  checklistIcon: {
+    fontSize: 24,
+    color: '#4FC3F7',
+  },
+  snapshotCard: {
+    marginBottom: spacing.lg,
+  },
+  snapshotHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  ringContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  macroBreakdown: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  macroItem: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  actionCard: {
+    marginBottom: spacing.md,
+  },
+  actionCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  actionIcon: {
+    fontSize: 32,
+  },
+  actionTextContainer: {
+    flex: 1,
+  },
+  arrowIcon: {
+    fontSize: 24,
+    opacity: 0.5,
+  },
+  closedCard: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+    alignItems: 'center',
+  },
+  closedTitle: {
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  closedMessageCard: {
+    marginBottom: spacing.md,
+  },
+  closedMessageText: {
+    textAlign: 'center',
+  },
+  // Meal period section styles
+  mealPeriodSection: {
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  sectionLabel: {
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  mealPeriodChips: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  mealPeriodChip: {
+    marginRight: spacing.sm,
+  },
+  // Mood section styles
+  moodSection: {
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  moodChips: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  moodChip: {
+    marginRight: spacing.sm,
+  },
+  moodInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  moodInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 16,
+    minHeight: 44,
+  },
+  clearButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  // Generate section styles
+  generateSection: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+});

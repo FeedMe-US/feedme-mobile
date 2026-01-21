@@ -1,0 +1,4809 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FeedMe API",
+    "description": "UCLA dining recommendation engine API",
+    "version": "1.0.0",
+    "x-generated-at": "2026-01-21T12:13:02.992467",
+    "x-generator": "export_openapi.py"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health Check",
+        "description": "Health check endpoint.\n\nNo authentication required.",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/menu/locations": {
+      "get": {
+        "tags": [
+          "menu"
+        ],
+        "summary": "List Locations",
+        "description": "List all dining locations with hours.\n\nReturns location info including current open status.",
+        "operationId": "list_locations_menu_locations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/menu/{location_id}/{menu_date}": {
+      "get": {
+        "tags": [
+          "menu"
+        ],
+        "summary": "Get Menu",
+        "description": "Get menu for a location on a specific date.\n\nReturns menu items grouped by meal period and section.",
+        "operationId": "get_menu_menu__location_id___menu_date__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "location_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Location Id"
+            }
+          },
+          {
+            "name": "menu_date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Menu Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/menu/byo/{recipe_id}/components": {
+      "get": {
+        "tags": [
+          "menu"
+        ],
+        "summary": "Get Byo Components",
+        "description": "Get components for a Build-Your-Own item.\n\nReturns available components organized by category (base, protein, topping, etc.)\nwith nutrition info, allergen info, and selection rules.\n\nQuery parameters:\n- exclude_allergens: Comma-separated list of allergens to filter (e.g., \"wheat,milk,eggs\").\n  Components containing these allergens will be marked as is_safe=False.\n  If not provided, fetches user's allergen_exclusions from their profile.",
+        "operationId": "get_byo_components_menu_byo__recipe_id__components_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recipe_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Recipe Id"
+            }
+          },
+          {
+            "name": "exclude_allergens",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Exclude Allergens"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BYOComponentsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/menu/byo/calculate": {
+      "post": {
+        "tags": [
+          "menu"
+        ],
+        "summary": "Calculate Byo Nutrition",
+        "description": "Calculate nutrition for a custom BYO build.\n\nPass an array of component recipe IDs to get the total nutrition.",
+        "operationId": "calculate_byo_nutrition_menu_byo_calculate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BYONutritionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BYONutritionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/menu/search": {
+      "post": {
+        "tags": [
+          "menu"
+        ],
+        "summary": "Search Menu",
+        "description": "Search menu items using semantic similarity.\n\nUses AI embeddings to find items that match your query, even if the\nexact words don't appear in the item name. For example, searching\n\"something with chicken\" will find items like \"Grilled Chicken Breast\"\nand \"Chicken Teriyaki\".\n\nQuery parameters:\n- query: What you're looking for (required)\n- location_id: Limit to a specific dining hall\n- meal_period: Filter by meal (breakfast, lunch, dinner, late_night)\n- date: Date to search (defaults to today)\n- area: Filter by area type (residential, campus)\n- limit: Maximum results (default 20, max 50)",
+        "operationId": "search_menu_menu_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MenuSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MenuSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/user/profile": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Get Profile",
+        "description": "Get current user profile.",
+        "operationId": "get_profile_user_profile_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__schemas__user__UserProfileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Update Profile",
+        "description": "Update user profile.\n\nChanging goal_type, weight, height, age, sex, or activity_level will\ntrigger automatic recalculation of daily targets (calories, protein, carbs, fat)\nunless the user has provided explicit manual overrides.",
+        "operationId": "update_profile_user_profile_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserProfileUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__schemas__user__UserProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/user/targets": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Get Targets",
+        "description": "Get today's adjusted targets (with redistribution).\n\nReturns targets adjusted based on week-to-date consumption.",
+        "operationId": "get_targets_user_targets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/user/progress": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Get Progress",
+        "description": "Get weekly or monthly progress stats.",
+        "operationId": "get_progress_user_progress_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "week",
+                "month"
+              ],
+              "type": "string",
+              "default": "week",
+              "title": "Period"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/day-plan": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Get Day Plan",
+        "description": "Get pre-computed day plan for the user.\n\nReturns a pre-computed day plan if available and fresh.\nIf the plan is stale or missing, regenerates it on-demand.",
+        "operationId": "get_day_plan_user_day_plan_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Date to get plan for (default: today)",
+              "title": "Plan Date"
+            },
+            "description": "Date to get plan for (default: today)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrecomputedDayPlanResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/weight": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Log Weight",
+        "description": "Log a weight entry and recalculate targets.\n\nWhen weight is logged:\n1. Entry is stored in weight_log table\n2. User's current weight is updated\n3. Daily targets are recalculated based on new weight (unless macros_custom_override is True)\n   - Protein recalculates based on new weight\n   - Carb/fat ratio is preserved from user preferences",
+        "operationId": "log_weight_user_weight_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeightLogRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeightLogResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/user/weight-history": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Get Weight History",
+        "description": "Get weight history for the last N weeks.\n\nReturns weight entries in reverse chronological order (newest first).",
+        "operationId": "get_weight_history_user_weight_history_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "weeks",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 52,
+              "minimum": 1,
+              "description": "Number of weeks of history",
+              "default": 8,
+              "title": "Weeks"
+            },
+            "description": "Number of weeks of history"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeightHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/preferences/reset": {
+      "delete": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Reset Preferences",
+        "description": "Reset all learned food preferences.\n\nThis deletes all entries from user_food_preferences table.\nDietary restrictions and allergen exclusions (stored in users table) are NOT affected.",
+        "operationId": "reset_preferences_user_preferences_reset_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/recommend": {
+      "post": {
+        "tags": [
+          "recommend"
+        ],
+        "summary": "Recommend",
+        "description": "Generate a single meal plate.\n\nReturns optimal plate for the given location and meal period,\nrespecting user's dietary restrictions and preferences.\n\nRate limit: 10 requests per day per user (rerolls).",
+        "operationId": "recommend_recommend_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No plate found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/recommend/day": {
+      "post": {
+        "tags": [
+          "recommend"
+        ],
+        "summary": "Recommend Day",
+        "description": "Generate a full day meal plan.\n\nReturns optimal meals across available locations for the entire day.",
+        "operationId": "recommend_day_recommend_day_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendDayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayPlanResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No plan found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/log": {
+      "get": {
+        "tags": [
+          "log"
+        ],
+        "summary": "Get Daily Log",
+        "description": "Get all food log entries for a specific date.\n\nReturns:\n- entries: List of logged meals with computed macros\n- totals: Consumed, remaining, and target macros",
+        "operationId": "get_daily_log_log_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "log_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Log Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyTrackingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "log"
+        ],
+        "summary": "Create Log",
+        "description": "Log a meal.\n\nAutomatically updates preferences if source is \"recommendation\".",
+        "operationId": "create_log_log_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/log/{log_id}": {
+      "put": {
+        "tags": [
+          "log"
+        ],
+        "summary": "Update Log",
+        "description": "Update a logged meal.",
+        "operationId": "update_log_log__log_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "log_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Log Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "log"
+        ],
+        "summary": "Delete Log",
+        "description": "Delete a logged meal.",
+        "operationId": "delete_log_log__log_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "log_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Log Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/preference/thumbs-up": {
+      "post": {
+        "tags": [
+          "preference"
+        ],
+        "summary": "Thumbs Up",
+        "description": "Explicit \"love this\" signal for a recipe.\n\nSignificantly boosts affinity score (+0.35).",
+        "operationId": "thumbs_up_preference_thumbs_up_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThumbsUpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThumbsUpResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/preference/block": {
+      "post": {
+        "tags": [
+          "preference"
+        ],
+        "summary": "Block Recipe",
+        "description": "Block a recipe (hard exclusion, never recommend).",
+        "operationId": "block_recipe_preference_block_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/preference/block/{recipe_id}": {
+      "delete": {
+        "tags": [
+          "preference"
+        ],
+        "summary": "Unblock Recipe",
+        "description": "Unblock a recipe.",
+        "operationId": "unblock_recipe_preference_block__recipe_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recipe_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Recipe Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scan/photo": {
+      "post": {
+        "tags": [
+          "scan"
+        ],
+        "summary": "Analyze Food Photo",
+        "description": "Analyze a food photo using AI to identify items and estimate nutrition.\n\nThis endpoint:\n1. Validates the uploaded image\n2. Stores it in Supabase storage for reference\n3. Sends it to the Food AI service for recognition\n4. Returns identified foods with confidence scores and macros\n\nThe `confidence` score (0-1) indicates how confident the AI is about each\nidentification. Values below 0.7 should trigger a disclaimer to the user.\n\nRate limit: 10 requests per day per user.",
+        "operationId": "analyze_food_photo_scan_photo_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_analyze_food_photo_scan_photo_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodAIResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/scan/barcode/{barcode}": {
+      "get": {
+        "tags": [
+          "scan"
+        ],
+        "summary": "Lookup Barcode",
+        "description": "Lookup product nutritional info by barcode using Open Food Facts.\n\nThis endpoint:\n1. First checks our local `external_foods` table for cached products\n2. If not found, queries the Open Food Facts API\n3. Caches successful lookups for future requests\n\nSupports UPC-A, UPC-E, EAN-8, and EAN-13 barcodes.\n\nRate limit: 20 requests per day per user.",
+        "operationId": "lookup_barcode_scan_barcode__barcode__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "barcode",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Barcode"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BarcodeLookupResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/check-email": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Check Email",
+        "description": "Check if an email belongs to a supported university.\n\nUse this before auth to show users if their university is supported.",
+        "operationId": "check_email_auth_check_email_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailCheckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Register User",
+        "description": "Complete user registration after Supabase auth.\n\nThis endpoint:\n1. Creates or updates the user record in our database\n2. Auto-detects and sets university_id from email domain\n3. Returns the user profile with university info",
+        "operationId": "register_user_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__routes__auth__UserProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Get Current User Profile",
+        "description": "Get current user's profile with university info.",
+        "operationId": "get_current_user_profile_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__routes__auth__UserProfileResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/auth/universities": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List Universities",
+        "description": "List all active universities (public endpoint for landing page).",
+        "operationId": "list_universities_auth_universities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UniversitiesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/food/search": {
+      "get": {
+        "tags": [
+          "food"
+        ],
+        "summary": "Search Foods",
+        "description": "Search for foods by name using USDA FoodData Central.\n\nReturns foods with nutritional information including:\n- Calories\n- Protein, carbs, fat\n- Fiber, sugar, sodium (when available)\n\nExamples:\n- /food/search?q=pasta\n- /food/search?q=chicken breast&limit=10",
+        "operationId": "search_foods_food_search_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "description": "Search query",
+              "title": "Q"
+            },
+            "description": "Search query"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "description": "Max results",
+              "default": 25,
+              "title": "Limit"
+            },
+            "description": "Max results"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/food/{food_id}": {
+      "get": {
+        "tags": [
+          "food"
+        ],
+        "summary": "Get Food",
+        "description": "Get detailed food info by ID.\n\nFood IDs are prefixed with their source:\n- usda_12345 -> USDA FoodData Central",
+        "operationId": "get_food_food__food_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "food_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Food Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodSearchItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "Root endpoint with API info.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdjustedTargetsResponse": {
+        "properties": {
+          "calories": {
+            "type": "integer",
+            "title": "Calories"
+          },
+          "protein_g": {
+            "type": "integer",
+            "title": "Protein G"
+          },
+          "carbs_g": {
+            "type": "integer",
+            "title": "Carbs G"
+          },
+          "fat_g": {
+            "type": "integer",
+            "title": "Fat G"
+          }
+        },
+        "type": "object",
+        "required": [
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g"
+        ],
+        "title": "AdjustedTargetsResponse",
+        "description": "Adjusted targets from redistribution."
+      },
+      "AdjustmentInfo": {
+        "properties": {
+          "factor": {
+            "type": "number",
+            "title": "Factor"
+          },
+          "capped": {
+            "type": "boolean",
+            "title": "Capped"
+          },
+          "cap_direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap Direction"
+          }
+        },
+        "type": "object",
+        "required": [
+          "factor",
+          "capped"
+        ],
+        "title": "AdjustmentInfo",
+        "description": "Adjustment metadata."
+      },
+      "BYOCategoryResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "min_selections": {
+            "type": "integer",
+            "title": "Min Selections",
+            "default": 0
+          },
+          "max_selections": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Selections"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/BYOComponentResponse"
+            },
+            "type": "array",
+            "title": "Components"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "display_name",
+          "components"
+        ],
+        "title": "BYOCategoryResponse",
+        "description": "A category of BYO components (e.g., 'protein', 'topping')."
+      },
+      "BYOComponentResponse": {
+        "properties": {
+          "recipe_id": {
+            "type": "string",
+            "title": "Recipe Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "calories": {
+            "type": "number",
+            "title": "Calories"
+          },
+          "protein_g": {
+            "type": "number",
+            "title": "Protein G"
+          },
+          "carbs_g": {
+            "type": "number",
+            "title": "Carbs G"
+          },
+          "fat_g": {
+            "type": "number",
+            "title": "Fat G"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          },
+          "display_order": {
+            "type": "integer",
+            "title": "Display Order",
+            "default": 0
+          },
+          "allergens": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allergens",
+            "default": []
+          },
+          "is_safe": {
+            "type": "boolean",
+            "title": "Is Safe",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "recipe_id",
+          "name",
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g"
+        ],
+        "title": "BYOComponentResponse",
+        "description": "A single component option for a BYO item."
+      },
+      "BYOComponentsResponse": {
+        "properties": {
+          "parent_recipe_id": {
+            "type": "string",
+            "title": "Parent Recipe Id"
+          },
+          "parent_name": {
+            "type": "string",
+            "title": "Parent Name"
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/BYOCategoryResponse"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "default_build": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BYODefaultBuild"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "safe_build": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BYODefaultBuild"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "is_byo_item": {
+            "type": "boolean",
+            "title": "Is Byo Item",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "parent_recipe_id",
+          "parent_name",
+          "categories"
+        ],
+        "title": "BYOComponentsResponse",
+        "description": "Response for GET /menu/byo/{recipe_id}/components."
+      },
+      "BYODefaultBuild": {
+        "properties": {
+          "component_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Component Ids"
+          },
+          "totals": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Totals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "component_ids",
+          "totals"
+        ],
+        "title": "BYODefaultBuild",
+        "description": "Default build configuration for a BYO item."
+      },
+      "BYONutritionRequest": {
+        "properties": {
+          "component_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Component Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "component_ids"
+        ],
+        "title": "BYONutritionRequest",
+        "description": "Request for POST /menu/byo/calculate."
+      },
+      "BYONutritionResponse": {
+        "properties": {
+          "calories": {
+            "type": "number",
+            "title": "Calories"
+          },
+          "protein_g": {
+            "type": "number",
+            "title": "Protein G"
+          },
+          "carbs_g": {
+            "type": "number",
+            "title": "Carbs G"
+          },
+          "fat_g": {
+            "type": "number",
+            "title": "Fat G"
+          }
+        },
+        "type": "object",
+        "required": [
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g"
+        ],
+        "title": "BYONutritionResponse",
+        "description": "Response for POST /menu/byo/calculate."
+      },
+      "BarcodeLookupResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether lookup succeeded"
+          },
+          "product": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BarcodeProductResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Product details if found"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message if failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "BarcodeLookupResponse",
+        "description": "Response from barcode lookup endpoint."
+      },
+      "BarcodeProductResponse": {
+        "properties": {
+          "barcode": {
+            "type": "string",
+            "title": "Barcode",
+            "description": "Product barcode (UPC/EAN)"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Product name"
+          },
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand",
+            "description": "Brand name"
+          },
+          "serving_size": {
+            "type": "string",
+            "title": "Serving Size",
+            "description": "Serving size description"
+          },
+          "calories": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Calories",
+            "description": "Calories per serving"
+          },
+          "protein_g": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Protein G",
+            "description": "Protein in grams"
+          },
+          "carbs_g": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Carbs G",
+            "description": "Carbohydrates in grams"
+          },
+          "fat_g": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Fat G",
+            "description": "Fat in grams"
+          },
+          "fiber_g": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiber G",
+            "description": "Fiber in grams"
+          },
+          "sugar_g": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sugar G",
+            "description": "Sugar in grams"
+          },
+          "sodium_mg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sodium Mg",
+            "description": "Sodium in milligrams"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url",
+            "description": "Product image URL"
+          }
+        },
+        "type": "object",
+        "required": [
+          "barcode",
+          "name",
+          "serving_size",
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g"
+        ],
+        "title": "BarcodeProductResponse",
+        "description": "Product information from barcode lookup."
+      },
+      "BlockRequest": {
+        "properties": {
+          "recipe_id": {
+            "type": "string",
+            "title": "Recipe Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recipe_id"
+        ],
+        "title": "BlockRequest",
+        "description": "Request body for POST /preference/block."
+      },
+      "BlockResponse": {
+        "properties": {
+          "recipe_id": {
+            "type": "string",
+            "title": "Recipe Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "blocked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Blocked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recipe_id",
+          "name",
+          "blocked_at"
+        ],
+        "title": "BlockResponse",
+        "description": "Response for POST /preference/block."
+      },
+      "Body_analyze_food_photo_scan_photo_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File",
+            "description": "Food photo to analyze"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_analyze_food_photo_scan_photo_post"
+      },
+      "DailySummary": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "calories": {
+            "type": "number",
+            "title": "Calories"
+          },
+          "protein_g": {
+            "type": "number",
+            "title": "Protein G"
+          },
+          "carbs_g": {
+            "type": "number",
+            "title": "Carbs G"
+          },
+          "fat_g": {
+            "type": "number",
+            "title": "Fat G"
+          },
+          "meals": {
+            "type": "integer",
+            "title": "Meals"
+          },
+          "on_target": {
+            "type": "boolean",
+            "title": "On Target"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g",
+          "meals",
+          "on_target"
+        ],
+        "title": "DailySummary",
+        "description": "Daily consumption summary."
+      },
+      "DailyTotals": {
+        "properties": {
+          "consumed": {
+            "$ref": "#/components/schemas/MacroTotals",
+            "description": "Macros consumed so far"
+          },
+          "remaining": {
+            "$ref": "#/components/schemas/MacroTotals",
+            "description": "Macros remaining (target - consumed, min 0)"
+          },
+          "target": {
+            "$ref": "#/components/schemas/MacroTotals",
+            "description": "Daily macro targets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "consumed",
+          "remaining",
+          "target"
+        ],
+        "title": "DailyTotals",
+        "description": "Consumed, remaining, and target macros for a day."
+      },
+      "DailyTrackingResponse": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date",
+            "description": "Date of the log"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/FoodLogEntry"
+            },
+            "type": "array",
+            "title": "Entries",
+            "description": "All log entries for the day"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/DailyTotals",
+            "description": "Consumed, remaining, and target macros"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "totals"
+        ],
+        "title": "DailyTrackingResponse",
+        "description": "Response for GET /log - full daily tracking data."
+      },
+      "DayPlanResponse": {
+        "properties": {
+          "day_plan": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Day Plan"
+          },
+          "targets": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Targets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day_plan",
+          "targets"
+        ],
+        "title": "DayPlanResponse",
+        "description": "Response for POST /recommend/day."
+      },
+      "DayProgressResponse": {
+        "properties": {
+          "calories": {
+            "$ref": "#/components/schemas/ProgressMetric"
+          },
+          "protein_g": {
+            "$ref": "#/components/schemas/ProgressMetric"
+          },
+          "carbs_g": {
+            "$ref": "#/components/schemas/ProgressMetric"
+          },
+          "fat_g": {
+            "$ref": "#/components/schemas/ProgressMetric"
+          }
+        },
+        "type": "object",
+        "required": [
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g"
+        ],
+        "title": "DayProgressResponse",
+        "description": "Progress metrics for the day."
+      },
+      "EmailCheckRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "EmailCheckRequest",
+        "description": "Request to check if an email is from a supported university."
+      },
+      "EmailCheckResponse": {
+        "properties": {
+          "is_university_email": {
+            "type": "boolean",
+            "title": "Is University Email"
+          },
+          "university": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniversityInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_university_email",
+          "message"
+        ],
+        "title": "EmailCheckResponse",
+        "description": "Response from email check."
+      },
+      "FoodAIItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the identified food"
+          },
+          "calories": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Calories",
+            "description": "Calories per serving"
+          },
+          "protein_g": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Protein G",
+            "description": "Protein in grams"
+          },
+          "carbs_g": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Carbs G",
+            "description": "Carbohydrates in grams"
+          },
+          "fat_g": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Fat G",
+            "description": "Fat in grams"
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "description": "AI confidence score (0-1)"
+          },
+          "serving_size": {
+            "type": "string",
+            "title": "Serving Size",
+            "description": "Estimated serving size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g",
+          "confidence",
+          "serving_size"
+        ],
+        "title": "FoodAIItem",
+        "description": "Single food item identified from AI recognition."
+      },
+      "FoodAIResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether recognition succeeded"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FoodAIItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "List of recognized foods"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url",
+            "description": "URL of the uploaded photo in storage"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message if failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "FoodAIResponse",
+        "description": "Response from food AI photo recognition endpoint."
+      },
+      "FoodLogEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "Unique log entry ID"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "User who logged this entry"
+          },
+          "recipe_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipe Id",
+            "description": "Recipe ID if from recommendation"
+          },
+          "food_name": {
+            "type": "string",
+            "title": "Food Name",
+            "description": "Name of the food item"
+          },
+          "servings": {
+            "type": "number",
+            "title": "Servings",
+            "description": "Number of servings"
+          },
+          "meal_type": {
+            "type": "string",
+            "enum": [
+              "breakfast",
+              "lunch",
+              "dinner",
+              "snack"
+            ],
+            "title": "Meal Type"
+          },
+          "logged_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Logged At",
+            "description": "When this was logged"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "recommendation",
+              "manual",
+              "photo_ai",
+              "barcode"
+            ],
+            "title": "Source"
+          },
+          "calories": {
+            "type": "number",
+            "title": "Calories",
+            "description": "Computed calories (per serving * servings)"
+          },
+          "protein_g": {
+            "type": "number",
+            "title": "Protein G",
+            "description": "Computed protein"
+          },
+          "carbs_g": {
+            "type": "number",
+            "title": "Carbs G",
+            "description": "Computed carbs"
+          },
+          "fat_g": {
+            "type": "number",
+            "title": "Fat G",
+            "description": "Computed fat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "food_name",
+          "servings",
+          "meal_type",
+          "logged_at",
+          "source",
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g"
+        ],
+        "title": "FoodLogEntry",
+        "description": "A single food log entry with computed macros."
+      },
+      "FoodSearchItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand"
+          },
+          "serving_size": {
+            "type": "string",
+            "title": "Serving Size"
+          },
+          "calories": {
+            "type": "number",
+            "title": "Calories"
+          },
+          "protein_g": {
+            "type": "number",
+            "title": "Protein G"
+          },
+          "carbs_g": {
+            "type": "number",
+            "title": "Carbs G"
+          },
+          "fat_g": {
+            "type": "number",
+            "title": "Fat G"
+          },
+          "fiber_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiber G"
+          },
+          "sugar_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sugar G"
+          },
+          "sodium_mg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sodium Mg"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "serving_size",
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g"
+        ],
+        "title": "FoodSearchItem",
+        "description": "Food item in search results."
+      },
+      "FoodSearchResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "foods": {
+            "items": {
+              "$ref": "#/components/schemas/FoodSearchItem"
+            },
+            "type": "array",
+            "title": "Foods"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "foods"
+        ],
+        "title": "FoodSearchResponse",
+        "description": "Food search response."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "unhealthy"
+            ],
+            "title": "Status",
+            "description": "Health status"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp",
+            "description": "ISO 8601 timestamp"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "API version"
+          },
+          "build": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Build",
+            "description": "Build timestamp for deployment verification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "timestamp",
+          "version"
+        ],
+        "title": "HealthResponse",
+        "description": "Health check response."
+      },
+      "LocationBrief": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "LocationBrief",
+        "description": "Brief location info for responses."
+      },
+      "LocationHoursResponse": {
+        "properties": {
+          "breakfast": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lunch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dinner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "late_night": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "LocationHoursResponse",
+        "description": "Hours for different meal periods."
+      },
+      "LocationResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "is_residential": {
+            "type": "boolean",
+            "title": "Is Residential"
+          },
+          "campus_area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campus Area"
+          },
+          "is_open_now": {
+            "type": "boolean",
+            "title": "Is Open Now",
+            "default": false
+          },
+          "current_meal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Meal"
+          },
+          "hours_today": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LocationHoursResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next_meal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Meal"
+          },
+          "next_meal_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Meal Time"
+          },
+          "available_periods": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Available Periods"
+          },
+          "is_all_day": {
+            "type": "boolean",
+            "title": "Is All Day",
+            "default": false
+          },
+          "area_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "hill",
+                  "campus"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "type",
+          "is_residential"
+        ],
+        "title": "LocationResponse",
+        "description": "Dining location info."
+      },
+      "LocationsResponse": {
+        "properties": {
+          "locations": {
+            "items": {
+              "$ref": "#/components/schemas/LocationResponse"
+            },
+            "type": "array",
+            "title": "Locations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "locations"
+        ],
+        "title": "LocationsResponse",
+        "description": "Response for GET /menu/locations."
+      },
+      "LogItemRequest": {
+        "properties": {
+          "recipe_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipe Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "servings": {
+            "type": "number",
+            "title": "Servings",
+            "default": 1.0
+          },
+          "calories": {
+            "type": "number",
+            "title": "Calories"
+          },
+          "protein_g": {
+            "type": "number",
+            "title": "Protein G"
+          },
+          "carbs_g": {
+            "type": "number",
+            "title": "Carbs G"
+          },
+          "fat_g": {
+            "type": "number",
+            "title": "Fat G"
+          },
+          "ai_confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Confidence"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
+          },
+          "ai_disclaimer_shown": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Disclaimer Shown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g"
+        ],
+        "title": "LogItemRequest",
+        "description": "Single item in a log request."
+      },
+      "LogRequest": {
+        "properties": {
+          "meal_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Meal Date"
+          },
+          "meal_type": {
+            "type": "string",
+            "enum": [
+              "breakfast",
+              "lunch",
+              "dinner",
+              "snack"
+            ],
+            "title": "Meal Type"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LogItemRequest"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Items"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "recommendation",
+              "manual",
+              "photo_ai",
+              "barcode"
+            ],
+            "title": "Source"
+          },
+          "recommendation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meal_date",
+          "meal_type",
+          "items",
+          "source"
+        ],
+        "title": "LogRequest",
+        "description": "Request body for POST /log."
+      },
+      "LogResponse": {
+        "properties": {
+          "log_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Log Id"
+          },
+          "logged_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Logged At"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/FoodLogEntry"
+            },
+            "type": "array",
+            "title": "Entries",
+            "description": "The logged entries with computed macros (for optimistic updates)"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/MacroTotals"
+          },
+          "day_progress": {
+            "$ref": "#/components/schemas/DayProgressResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "log_id",
+          "logged_at",
+          "entries",
+          "totals",
+          "day_progress"
+        ],
+        "title": "LogResponse",
+        "description": "Response for POST /log and PUT /log/{id}."
+      },
+      "LogUpdateRequest": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LogItemRequest"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "LogUpdateRequest",
+        "description": "Request body for PUT /log/{id}."
+      },
+      "MacroTotals": {
+        "properties": {
+          "calories": {
+            "type": "number",
+            "title": "Calories"
+          },
+          "protein_g": {
+            "type": "number",
+            "title": "Protein G"
+          },
+          "carbs_g": {
+            "type": "number",
+            "title": "Carbs G"
+          },
+          "fat_g": {
+            "type": "number",
+            "title": "Fat G"
+          }
+        },
+        "type": "object",
+        "required": [
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g"
+        ],
+        "title": "MacroTotals",
+        "description": "Macro nutrient totals."
+      },
+      "MealMenuResponse": {
+        "properties": {
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/MenuSectionResponse"
+            },
+            "type": "array",
+            "title": "Sections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sections"
+        ],
+        "title": "MealMenuResponse",
+        "description": "Menu for a meal period."
+      },
+      "MealPatternResponse": {
+        "properties": {
+          "meals": {
+            "items": {
+              "$ref": "#/components/schemas/MealWindowResponse"
+            },
+            "type": "array",
+            "title": "Meals"
+          },
+          "avg_meals_per_day": {
+            "type": "number",
+            "title": "Avg Meals Per Day"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meals",
+          "avg_meals_per_day"
+        ],
+        "title": "MealPatternResponse",
+        "description": "Learned meal timing pattern."
+      },
+      "MealTimesRequest": {
+        "properties": {
+          "breakfast": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Breakfast"
+          },
+          "lunch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lunch"
+          },
+          "dinner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dinner"
+          }
+        },
+        "type": "object",
+        "title": "MealTimesRequest",
+        "description": "Meal timing preferences from onboarding."
+      },
+      "MealWindowResponse": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "pct": {
+            "type": "number",
+            "title": "Pct"
+          },
+          "avg_time": {
+            "type": "string",
+            "title": "Avg Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "pct",
+          "avg_time"
+        ],
+        "title": "MealWindowResponse",
+        "description": "Single meal window in a pattern."
+      },
+      "MenuItemResponse": {
+        "properties": {
+          "recipe_id": {
+            "type": "string",
+            "title": "Recipe Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "calories": {
+            "type": "number",
+            "title": "Calories"
+          },
+          "protein_g": {
+            "type": "number",
+            "title": "Protein G"
+          },
+          "carbs_g": {
+            "type": "number",
+            "title": "Carbs G"
+          },
+          "fat_g": {
+            "type": "number",
+            "title": "Fat G"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "allergens": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allergens"
+          },
+          "serving_size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serving Size"
+          },
+          "fiber_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiber G"
+          },
+          "sodium_mg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sodium Mg"
+          },
+          "sugar_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sugar G"
+          },
+          "saturated_fat_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saturated Fat G"
+          },
+          "trans_fat_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trans Fat G"
+          },
+          "cholesterol_mg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cholesterol Mg"
+          },
+          "added_sugars_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added Sugars G"
+          },
+          "calcium_mg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calcium Mg"
+          },
+          "iron_mg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iron Mg"
+          },
+          "potassium_mg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Potassium Mg"
+          },
+          "vitamin_d_mcg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vitamin D Mcg"
+          },
+          "vitamin_a_mcg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vitamin A Mcg"
+          },
+          "vitamin_b6_mg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vitamin B6 Mg"
+          },
+          "vitamin_b12_mcg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vitamin B12 Mcg"
+          },
+          "vitamin_c_mg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vitamin C Mg"
+          },
+          "ingredients": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredients"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recipe_id",
+          "name",
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g",
+          "tags",
+          "allergens"
+        ],
+        "title": "MenuItemResponse",
+        "description": "Menu item with nutrition info."
+      },
+      "MenuResponse": {
+        "properties": {
+          "location": {
+            "$ref": "#/components/schemas/LocationResponse"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "meals": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MealMenuResponse"
+            },
+            "type": "object",
+            "title": "Meals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location",
+          "date",
+          "meals"
+        ],
+        "title": "MenuResponse",
+        "description": "Response for GET /menu/{location_id}/{date}."
+      },
+      "MenuSearchRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Query",
+            "description": "Search query"
+          },
+          "location_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Id",
+            "description": "Specific location to search"
+          },
+          "meal_period": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "breakfast",
+                  "lunch",
+                  "dinner",
+                  "late_night"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meal Period"
+          },
+          "search_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Date",
+            "description": "Date to search (defaults to today)"
+          },
+          "area": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "residential",
+                  "campus"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area",
+            "description": "Area filter"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "description": "Maximum results",
+            "default": 20
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "MenuSearchRequest",
+        "description": "Request for POST /menu/search."
+      },
+      "MenuSearchResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/MenuSearchResultItem"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "results",
+          "total_count"
+        ],
+        "title": "MenuSearchResponse",
+        "description": "Response for POST /menu/search."
+      },
+      "MenuSearchResultItem": {
+        "properties": {
+          "recipe_id": {
+            "type": "string",
+            "title": "Recipe Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "location_id": {
+            "type": "integer",
+            "title": "Location Id"
+          },
+          "location_name": {
+            "type": "string",
+            "title": "Location Name"
+          },
+          "section": {
+            "type": "string",
+            "title": "Section"
+          },
+          "calories": {
+            "type": "number",
+            "title": "Calories"
+          },
+          "protein_g": {
+            "type": "number",
+            "title": "Protein G"
+          },
+          "carbs_g": {
+            "type": "number",
+            "title": "Carbs G"
+          },
+          "fat_g": {
+            "type": "number",
+            "title": "Fat G"
+          },
+          "similarity": {
+            "type": "number",
+            "title": "Similarity",
+            "description": "Semantic similarity score (0-1)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recipe_id",
+          "name",
+          "location_id",
+          "location_name",
+          "section",
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g",
+          "similarity"
+        ],
+        "title": "MenuSearchResultItem",
+        "description": "A single search result item."
+      },
+      "MenuSectionResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MenuItemResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "items"
+        ],
+        "title": "MenuSectionResponse",
+        "description": "Section of a menu (e.g., \"The Grill\")."
+      },
+      "PlateItemResponse": {
+        "properties": {
+          "recipe_id": {
+            "type": "string",
+            "title": "Recipe Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "servings": {
+            "type": "integer",
+            "title": "Servings"
+          },
+          "calories": {
+            "type": "number",
+            "title": "Calories"
+          },
+          "protein_g": {
+            "type": "number",
+            "title": "Protein G"
+          },
+          "carbs_g": {
+            "type": "number",
+            "title": "Carbs G"
+          },
+          "fat_g": {
+            "type": "number",
+            "title": "Fat G"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recipe_id",
+          "name",
+          "servings",
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g"
+        ],
+        "title": "PlateItemResponse",
+        "description": "Single item on a plate."
+      },
+      "PlateResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlateItemResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/MacroTotals"
+          },
+          "fit_score": {
+            "type": "integer",
+            "title": "Fit Score"
+          },
+          "preference_score": {
+            "type": "number",
+            "title": "Preference Score"
+          },
+          "engine": {
+            "type": "string",
+            "enum": [
+              "ortools",
+              "rag"
+            ],
+            "title": "Engine",
+            "description": "Which engine generated this recommendation",
+            "default": "ortools"
+          },
+          "fallback_used": {
+            "type": "boolean",
+            "title": "Fallback Used",
+            "description": "True if RAG was attempted but fell back to OR-Tools",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "totals",
+          "fit_score",
+          "preference_score"
+        ],
+        "title": "PlateResponse",
+        "description": "Complete plate recommendation."
+      },
+      "PrecomputedDayPlanResponse": {
+        "properties": {
+          "plan": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Plan"
+          },
+          "targets": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Targets"
+          },
+          "generated_at": {
+            "type": "string",
+            "title": "Generated At"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "precomputed",
+              "regenerated"
+            ],
+            "title": "Source"
+          },
+          "regeneration_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regeneration Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan",
+          "targets",
+          "generated_at",
+          "stale",
+          "source"
+        ],
+        "title": "PrecomputedDayPlanResponse",
+        "description": "Response for GET /user/day-plan - pre-computed daily plan."
+      },
+      "ProgressMetric": {
+        "properties": {
+          "consumed": {
+            "type": "number",
+            "title": "Consumed"
+          },
+          "target": {
+            "type": "number",
+            "title": "Target"
+          },
+          "remaining": {
+            "type": "number",
+            "title": "Remaining"
+          },
+          "pct": {
+            "type": "integer",
+            "title": "Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "consumed",
+          "target",
+          "remaining",
+          "pct"
+        ],
+        "title": "ProgressMetric",
+        "description": "Progress metric for a single nutrient."
+      },
+      "ProgressResponse": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "End Date"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ProgressSummary"
+          },
+          "daily": {
+            "items": {
+              "$ref": "#/components/schemas/DailySummary"
+            },
+            "type": "array",
+            "title": "Daily"
+          },
+          "weight": {
+            "$ref": "#/components/schemas/WeightProgress"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "start_date",
+          "end_date",
+          "summary",
+          "daily",
+          "weight"
+        ],
+        "title": "ProgressResponse",
+        "description": "Response for GET /user/progress."
+      },
+      "ProgressSummary": {
+        "properties": {
+          "days_logged": {
+            "type": "integer",
+            "title": "Days Logged"
+          },
+          "total_meals": {
+            "type": "integer",
+            "title": "Total Meals"
+          },
+          "avg_calories": {
+            "type": "number",
+            "title": "Avg Calories"
+          },
+          "avg_protein_g": {
+            "type": "number",
+            "title": "Avg Protein G"
+          },
+          "target_adherence": {
+            "type": "number",
+            "title": "Target Adherence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days_logged",
+          "total_meals",
+          "avg_calories",
+          "avg_protein_g",
+          "target_adherence"
+        ],
+        "title": "ProgressSummary",
+        "description": "Summary stats for a period."
+      },
+      "RecommendDayRequest": {
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "preferred_location_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Preferred Location Ids"
+          }
+        },
+        "type": "object",
+        "title": "RecommendDayRequest",
+        "description": "Request body for POST /recommend/day."
+      },
+      "RecommendRequest": {
+        "properties": {
+          "location_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Id",
+            "description": "Location ID, or None for 'any hall' mode"
+          },
+          "meal_period": {
+            "type": "string",
+            "enum": [
+              "breakfast",
+              "lunch",
+              "dinner",
+              "late_night"
+            ],
+            "title": "Meal Period"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "excluded_recipe_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Excluded Recipe Ids"
+          },
+          "mood": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mood",
+            "description": "User's mood or craving, e.g., 'something spicy'"
+          },
+          "area": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "hill",
+                  "campus"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area",
+            "description": "Area filter for 'any hall' mode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meal_period"
+        ],
+        "title": "RecommendRequest",
+        "description": "Request body for POST /recommend."
+      },
+      "RecommendResponse": {
+        "properties": {
+          "plate": {
+            "$ref": "#/components/schemas/PlateResponse"
+          },
+          "targets": {
+            "$ref": "#/components/schemas/MacroTotals"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LocationBrief"
+          },
+          "meal_period": {
+            "type": "string",
+            "title": "Meal Period"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plate",
+          "targets",
+          "location",
+          "meal_period",
+          "date"
+        ],
+        "title": "RecommendResponse",
+        "description": "Response for POST /recommend."
+      },
+      "RegisterRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "RegisterRequest",
+        "description": "User registration request after Supabase auth."
+      },
+      "TargetsResponse": {
+        "properties": {
+          "targets": {
+            "$ref": "#/components/schemas/AdjustedTargetsResponse"
+          },
+          "base_targets": {
+            "$ref": "#/components/schemas/UserTargetsResponse"
+          },
+          "adjustment": {
+            "$ref": "#/components/schemas/AdjustmentInfo"
+          },
+          "week_summary": {
+            "$ref": "#/components/schemas/WeekSummaryResponse"
+          },
+          "today_progress": {
+            "$ref": "#/components/schemas/TodayProgressResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "targets",
+          "base_targets",
+          "adjustment",
+          "week_summary",
+          "today_progress"
+        ],
+        "title": "TargetsResponse",
+        "description": "Response for GET /user/targets."
+      },
+      "ThumbsUpRequest": {
+        "properties": {
+          "recipe_id": {
+            "type": "string",
+            "title": "Recipe Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recipe_id"
+        ],
+        "title": "ThumbsUpRequest",
+        "description": "Request body for POST /preference/thumbs-up."
+      },
+      "ThumbsUpResponse": {
+        "properties": {
+          "recipe_id": {
+            "type": "string",
+            "title": "Recipe Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "previous_score": {
+            "type": "number",
+            "title": "Previous Score"
+          },
+          "new_score": {
+            "type": "number",
+            "title": "New Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recipe_id",
+          "name",
+          "previous_score",
+          "new_score"
+        ],
+        "title": "ThumbsUpResponse",
+        "description": "Response for POST /preference/thumbs-up."
+      },
+      "TimeRange": {
+        "properties": {
+          "open": {
+            "type": "string",
+            "title": "Open"
+          },
+          "close": {
+            "type": "string",
+            "title": "Close"
+          }
+        },
+        "type": "object",
+        "required": [
+          "open",
+          "close"
+        ],
+        "title": "TimeRange",
+        "description": "Time range for meal hours."
+      },
+      "TodayProgressResponse": {
+        "properties": {
+          "logged_calories": {
+            "type": "number",
+            "title": "Logged Calories"
+          },
+          "logged_protein_g": {
+            "type": "number",
+            "title": "Logged Protein G"
+          },
+          "logged_carbs_g": {
+            "type": "number",
+            "title": "Logged Carbs G"
+          },
+          "logged_fat_g": {
+            "type": "number",
+            "title": "Logged Fat G"
+          },
+          "meals_logged": {
+            "type": "integer",
+            "title": "Meals Logged"
+          }
+        },
+        "type": "object",
+        "required": [
+          "logged_calories",
+          "logged_protein_g",
+          "logged_carbs_g",
+          "logged_fat_g",
+          "meals_logged"
+        ],
+        "title": "TodayProgressResponse",
+        "description": "Today's consumption progress."
+      },
+      "UniversitiesResponse": {
+        "properties": {
+          "universities": {
+            "items": {
+              "$ref": "#/components/schemas/UniversityInfo"
+            },
+            "type": "array",
+            "title": "Universities"
+          }
+        },
+        "type": "object",
+        "required": [
+          "universities"
+        ],
+        "title": "UniversitiesResponse",
+        "description": "Response for list of universities."
+      },
+      "UniversityInfo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "logo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Url"
+          },
+          "primary_color": {
+            "type": "string",
+            "title": "Primary Color",
+            "default": "#2774AE"
+          },
+          "is_supported": {
+            "type": "boolean",
+            "title": "Is Supported",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slug",
+          "name"
+        ],
+        "title": "UniversityInfo",
+        "description": "University information returned from detection."
+      },
+      "UserProfileUpdateRequest": {
+        "properties": {
+          "age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "male",
+                  "female"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sex"
+          },
+          "height_inches": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Inches"
+          },
+          "weight_lbs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Lbs"
+          },
+          "goal_weight_lbs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Weight Lbs"
+          },
+          "activity_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Level"
+          },
+          "goal_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Type"
+          },
+          "dietary_restrictions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dietary Restrictions"
+          },
+          "allergen_exclusions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allergen Exclusions"
+          },
+          "preferred_locations": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Locations"
+          },
+          "onboarding_complete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onboarding Complete"
+          },
+          "meals_per_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meals Per Day"
+          },
+          "meal_times": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealTimesRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "daily_calories": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Calories"
+          },
+          "daily_protein_g": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Protein G"
+          },
+          "daily_carbs_g": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Carbs G"
+          },
+          "daily_fat_g": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Fat G"
+          },
+          "macros_custom_override": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Macros Custom Override"
+          },
+          "carb_fat_ratio": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 10.0,
+                "minimum": 0.1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carb Fat Ratio"
+          },
+          "protein_locked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Locked"
+          },
+          "protein_multiplier": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": 0.5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Multiplier"
+          }
+        },
+        "type": "object",
+        "title": "UserProfileUpdateRequest",
+        "description": "Request body for PUT /user/profile."
+      },
+      "UserTargetsResponse": {
+        "properties": {
+          "daily_calories": {
+            "type": "integer",
+            "title": "Daily Calories"
+          },
+          "daily_protein_g": {
+            "type": "integer",
+            "title": "Daily Protein G"
+          },
+          "daily_carbs_g": {
+            "type": "integer",
+            "title": "Daily Carbs G"
+          },
+          "daily_fat_g": {
+            "type": "integer",
+            "title": "Daily Fat G"
+          }
+        },
+        "type": "object",
+        "required": [
+          "daily_calories",
+          "daily_protein_g",
+          "daily_carbs_g",
+          "daily_fat_g"
+        ],
+        "title": "UserTargetsResponse",
+        "description": "User's daily nutritional targets."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WeekSummaryResponse": {
+        "properties": {
+          "week_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Week Start"
+          },
+          "days_elapsed": {
+            "type": "integer",
+            "title": "Days Elapsed"
+          },
+          "days_remaining": {
+            "type": "integer",
+            "title": "Days Remaining"
+          },
+          "logged_calories": {
+            "type": "integer",
+            "title": "Logged Calories"
+          },
+          "weekly_budget": {
+            "type": "integer",
+            "title": "Weekly Budget"
+          },
+          "remaining_budget": {
+            "type": "integer",
+            "title": "Remaining Budget"
+          }
+        },
+        "type": "object",
+        "required": [
+          "week_start",
+          "days_elapsed",
+          "days_remaining",
+          "logged_calories",
+          "weekly_budget",
+          "remaining_budget"
+        ],
+        "title": "WeekSummaryResponse",
+        "description": "Week summary for redistribution context."
+      },
+      "WeightHistoryResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/WeightLogEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "current_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Weight"
+          },
+          "goal_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Weight"
+          },
+          "start_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Weight"
+          },
+          "total_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Change"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entries"
+        ],
+        "title": "WeightHistoryResponse",
+        "description": "Response for GET /user/weight-history."
+      },
+      "WeightLogEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "weight_lbs": {
+            "type": "number",
+            "title": "Weight Lbs"
+          },
+          "logged_at": {
+            "type": "string",
+            "title": "Logged At"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "inferred"
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "weight_lbs",
+          "logged_at",
+          "source"
+        ],
+        "title": "WeightLogEntry",
+        "description": "A single weight log entry."
+      },
+      "WeightLogRequest": {
+        "properties": {
+          "weight_lbs": {
+            "type": "number",
+            "maximum": 500.0,
+            "minimum": 50.0,
+            "title": "Weight Lbs",
+            "description": "Weight in pounds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "weight_lbs"
+        ],
+        "title": "WeightLogRequest",
+        "description": "Request body for POST /user/weight."
+      },
+      "WeightLogResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "weight_lbs": {
+            "type": "number",
+            "title": "Weight Lbs"
+          },
+          "logged_at": {
+            "type": "string",
+            "title": "Logged At"
+          },
+          "targets_recalculated": {
+            "type": "boolean",
+            "title": "Targets Recalculated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "weight_lbs",
+          "logged_at",
+          "targets_recalculated"
+        ],
+        "title": "WeightLogResponse",
+        "description": "Response for POST /user/weight."
+      },
+      "WeightProgress": {
+        "properties": {
+          "start": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "on_track": {
+            "type": "boolean",
+            "title": "On Track",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "WeightProgress",
+        "description": "Weight change over period."
+      },
+      "src__routes__auth__UserProfileResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "university_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "University Id"
+          },
+          "university_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "University Slug"
+          },
+          "university_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "University Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "email"
+        ],
+        "title": "UserProfileResponse",
+        "description": "User profile with university info."
+      },
+      "src__schemas__user__UserProfileResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "male",
+                  "female"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sex"
+          },
+          "height_inches": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Inches"
+          },
+          "weight_lbs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Lbs"
+          },
+          "activity_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Level"
+          },
+          "goal_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Type"
+          },
+          "dietary_restrictions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dietary Restrictions"
+          },
+          "allergen_exclusions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allergen Exclusions"
+          },
+          "preferred_locations": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Preferred Locations"
+          },
+          "onboarding_complete": {
+            "type": "boolean",
+            "title": "Onboarding Complete",
+            "default": false
+          },
+          "targets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserTargetsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meal_pattern": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealPatternResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "macros_custom_override": {
+            "type": "boolean",
+            "title": "Macros Custom Override",
+            "default": false
+          },
+          "carb_fat_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carb Fat Ratio"
+          },
+          "protein_locked": {
+            "type": "boolean",
+            "title": "Protein Locked",
+            "default": true
+          },
+          "protein_multiplier": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Multiplier"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email"
+        ],
+        "title": "UserProfileResponse",
+        "description": "Response for GET /user/profile."
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
