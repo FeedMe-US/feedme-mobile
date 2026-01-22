@@ -41,4 +41,6 @@ jobs:
       - name: Build
         run: |
           PROFILE="${{ github.event.inputs.profile || 'preview' }}"
-          eas build --platform all --profile $PROFILE --non-interactive
+          # iOS disabled until Apple Developer credentials are configured
+          # Change to --platform all when iOS is ready
+          eas build --platform android --profile $PROFILE --non-interactive
