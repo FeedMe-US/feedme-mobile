@@ -41,6 +41,7 @@ export interface OnboardingData {
   // Custom macro targets
   useCustomTargets?: boolean; // If true, user has set custom macro values
   selectedVitamins?: string[]; // Vitamins to track in progress page
+  carbFatRatio?: number; // User's preferred carb/fat ratio (0-100, where 0 = all fats, 100 = all carbs)
 
   // Meal preference seeding (from swipe onboarding)
   likedMealIds?: string[];
