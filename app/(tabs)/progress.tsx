@@ -38,7 +38,7 @@ export default function ProgressScreen() {
   const [weeklyData, setWeeklyData] = useState<WeeklyStats[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyStats[]>([]);
   const [dailyData, setDailyData] = useState<DailyStats[]>([]);
-  const [selectedVitamins, setSelectedVitamins] = useState<string[]>(['Vit D', 'B12', 'Iron']);
+  const [selectedVitamins, setSelectedVitamins] = useState<string[]>([]);
   const [accountCreatedAt, setAccountCreatedAt] = useState<string | null>(null);
 
   // Load user's selected vitamins from profile/onboarding data
@@ -100,7 +100,6 @@ export default function ProgressScreen() {
   const loadAnalyticsData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Analytics service now always returns mock data immediately
       if (period === 'weekly') {
         const data = await analyticsService.getWeeklyStats(4);
         setWeeklyData(data);
@@ -285,13 +284,16 @@ function DailyView({ tracking, macroSplit, selectedVitamins }: { tracking: any; 
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light']; // Default to light for Neumorphism
 
-  // Map vitamin names to display names and abbreviations
+  // Map backend vitamin keys to display abbreviations
   const vitaminDisplayMap: Record<string, string> = {
-    'Vit D': 'Vit D',
-    'B12': 'B12',
-    'Iron': 'Iron',
-    'Calcium': 'Ca',
-    'Magnesium': 'Mg',
+    'vitamin_d_mcg': 'Vit D',
+    'vitamin_b12_mcg': 'B12',
+    'vitamin_c_mg': 'Vit C',
+    'vitamin_a_mcg': 'Vit A',
+    'vitamin_b6_mg': 'B6',
+    'iron_mg': 'Iron',
+    'calcium_mg': 'Ca',
+    'potassium_mg': 'K',
   };
 
   return (

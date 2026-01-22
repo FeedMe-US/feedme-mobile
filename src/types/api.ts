@@ -85,6 +85,25 @@ export type FoodLogEntry = Schemas['FoodLogEntry'];
 export type DailyTotals = Schemas['DailyTotals'];
 export type DailyTrackingResponse = Schemas['DailyTrackingResponse'];
 
+// === Micronutrient Types (pending OpenAPI regeneration) ===
+/** Progress for a single tracked micronutrient */
+export interface MicronutrientProgress {
+  /** Micronutrient key (e.g., 'vitamin_d_mcg') */
+  key: string;
+  /** Human-readable name (e.g., 'Vitamin D') */
+  display_name: string;
+  /** Unit of measurement (e.g., 'mcg') */
+  unit: string;
+  /** Amount consumed today */
+  consumed: number;
+  /** Daily target */
+  target: number;
+  /** Remaining (target - consumed, min 0) */
+  remaining: number;
+  /** Percentage of target consumed */
+  pct: number;
+}
+
 // === Preference Types ===
 export type ThumbsUpRequest = Schemas['ThumbsUpRequest'];
 export type ThumbsUpResponse = Schemas['ThumbsUpResponse'];

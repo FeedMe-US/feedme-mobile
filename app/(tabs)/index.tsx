@@ -29,7 +29,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light']; // Default to light for Neumorphism
   const router = useRouter();
-  const { tracking, addMeal } = useDailyTracking();
+  const { tracking, addMeal, refreshFromBackend } = useDailyTracking();
 
   // Hall selection state - default to "Any Hill" mode so content shows on scroll
   const [selectedHallSlug, setSelectedHallSlug] = useState<string | null>(null);
@@ -61,6 +61,13 @@ export default function HomeScreen() {
     else if (hour < 17) setGreeting('Good Afternoon');
     else setGreeting('Good Evening');
   }, []);
+
+  // Refresh daily tracking (including micronutrients) when screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      refreshFromBackend();
+    }, [refreshFromBackend])
+  );
 
   // Get available periods for the current selection
   const getAvailablePeriods = useCallback((): MealPeriod[] => {
@@ -490,6 +497,48 @@ useFocusEffect(
               </Text>
             </View>
           </View>
+
+          {/* Micronutrient Progress - only show if user has tracked vitamins */}
+          {tracking.micronutrients.length > 0 && (
+            <View style={styles.micronutrientSection}>
+              <View style={styles.micronutrientHeader}>
+                <Text variant="caption" color="secondary">
+                  Vitamins & Minerals
+                </Text>
+              </View>
+              <View style={styles.micronutrientGrid}>
+                {tracking.micronutrients.slice(0, 4).map((nutrient) => (
+                  <View key={nutrient.key} style={styles.micronutrientItem}>
+                    <View style={styles.micronutrientProgress}>
+                      <View
+                        style={[
+                          styles.micronutrientBar,
+                          {
+                            backgroundColor: themeColors.border,
+                          },
+                        ]}>
+                        <View
+                          style={[
+                            styles.micronutrientBarFill,
+                            {
+                              backgroundColor: nutrient.pct >= 100 ? themeColors.success : themeColors.primary,
+                              width: `${Math.min(100, nutrient.pct)}%`,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text variant="caption" color="secondary" style={styles.micronutrientPct}>
+                        {nutrient.pct}%
+                      </Text>
+                    </View>
+                    <Text variant="caption" color="secondary" style={styles.micronutrientLabel}>
+                      {nutrient.display_name}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
         </Card>
 
         {/* Dining Hall Selector */}
@@ -842,6 +891,49 @@ const styles = StyleSheet.create({
   macroItem: {
     alignItems: 'center',
     gap: spacing.xs,
+  },
+  // Micronutrient progress styles
+  micronutrientSection: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  micronutrientHeader: {
+    marginBottom: spacing.sm,
+  },
+  micronutrientGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  micronutrientItem: {
+    flex: 1,
+    minWidth: '45%',
+  },
+  micronutrientProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: 2,
+  },
+  micronutrientBar: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  micronutrientBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  micronutrientPct: {
+    fontSize: 10,
+    minWidth: 28,
+    textAlign: 'right',
+  },
+  micronutrientLabel: {
+    fontSize: 11,
   },
   actionCard: {
     marginBottom: spacing.md,

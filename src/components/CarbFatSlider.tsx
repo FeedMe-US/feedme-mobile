@@ -3,17 +3,13 @@
  *
  * Allows users to adjust how remaining calories (after protein) are split
  * between carbohydrates and fats. Uses a visual slider with live gram updates.
+ *
+ * Note: Using PanResponder instead of react-native-gesture-handler to avoid
+ * native crash issues with reanimated worklets accessing React props.
  */
 
-import React, { useCallback, useMemo } from 'react';
-import { View, StyleSheet, LayoutChangeEvent } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  runOnJS,
-  withSpring,
-} from 'react-native-reanimated';
+import React, { useCallback, useMemo, useState, useRef } from 'react';
+import { View, StyleSheet, PanResponder, LayoutChangeEvent } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors, spacing, radius } from '@/src/theme';
 import { Text } from '@/src/ui/Text';
@@ -80,9 +76,8 @@ export function CarbFatSlider({
   const effectiveMinFatGrams = minFatGrams ?? (sex === 'male' ? 50 : 40);
 
   // Track slider width for position calculations
-  const sliderWidth = useSharedValue(200);
-  const translateX = useSharedValue(0);
-  const isDragging = useSharedValue(false);
+  const [sliderWidth, setSliderWidth] = useState(200);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Calculate current values
   const { fatGrams, carbGrams, fatPercent, carbPercent } = useMemo(
@@ -131,56 +126,45 @@ export function CarbFatSlider({
 
   // Handle layout to get slider width
   const onLayout = useCallback((event: LayoutChangeEvent) => {
-    sliderWidth.value = event.nativeEvent.layout.width;
+    setSliderWidth(event.nativeEvent.layout.width);
   }, []);
 
-  // Pan gesture for dragging the slider
-  const panGesture = Gesture.Pan()
-    .onStart(() => {
-      isDragging.value = true;
-      runOnJS(haptics.light)();
-    })
-    .onUpdate((event) => {
-      const position = Math.max(0, Math.min(sliderWidth.value, event.x));
-      const percent = (position / sliderWidth.value) * 100;
-      runOnJS(updateRatio)(percent);
-    })
-    .onEnd(() => {
-      isDragging.value = false;
-      runOnJS(haptics.light)();
-    });
+  // Store refs for PanResponder (to access current sliderWidth)
+  const sliderWidthRef = useRef(sliderWidth);
+  sliderWidthRef.current = sliderWidth;
 
-  // Tap gesture for quick position changes
-  const tapGesture = Gesture.Tap().onEnd((event) => {
-    const position = Math.max(0, Math.min(sliderWidth.value, event.x));
-    const percent = (position / sliderWidth.value) * 100;
-    runOnJS(haptics.medium)();
-    runOnJS(updateRatio)(percent);
-  });
+  // PanResponder for drag handling
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (evt) => {
+          setIsDragging(true);
+          haptics.light();
+          // Calculate position from touch
+          const touchX = evt.nativeEvent.locationX;
+          const percent = (touchX / sliderWidthRef.current) * 100;
+          updateRatio(percent);
+        },
+        onPanResponderMove: (evt) => {
+          const touchX = evt.nativeEvent.locationX;
+          const percent = (touchX / sliderWidthRef.current) * 100;
+          updateRatio(percent);
+        },
+        onPanResponderRelease: () => {
+          setIsDragging(false);
+          haptics.light();
+        },
+        onPanResponderTerminate: () => {
+          setIsDragging(false);
+        },
+      }),
+    [updateRatio]
+  );
 
-  // Combine gestures
-  const gesture = Gesture.Race(panGesture, tapGesture);
-
-  // Animated styles for the thumb
-  const thumbStyle = useAnimatedStyle(() => {
-    const percent = ratioToPercent(carbFatRatio);
-    const position = (percent / 100) * sliderWidth.value;
-
-    return {
-      transform: [
-        { translateX: withSpring(position - 12, { damping: 15, stiffness: 150 }) },
-        { scale: isDragging.value ? 1.2 : 1 },
-      ] as const,
-    };
-  });
-
-  // Animated style for the filled track
-  const filledTrackStyle = useAnimatedStyle(() => {
-    const percent = ratioToPercent(carbFatRatio);
-    return {
-      width: `${percent}%`,
-    };
-  });
+  // Calculate thumb position
+  const thumbPosition = (currentPercent / 100) * sliderWidth - 12;
 
   return (
     <View style={styles.container}>
@@ -200,33 +184,34 @@ export function CarbFatSlider({
       </View>
 
       {/* Slider */}
-      <GestureDetector gesture={gesture}>
+      <View
+        style={[styles.sliderContainer, { backgroundColor: themeColors.backgroundTertiary }]}
+        onLayout={onLayout}
+        {...panResponder.panHandlers}
+      >
+        {/* Fat side (unfilled) - Pink */}
+        <View style={[styles.trackBackground, { backgroundColor: themeColors.fats + '40' }]} />
+
+        {/* Carb side (filled) - Purple */}
         <View
-          style={[styles.sliderContainer, { backgroundColor: themeColors.backgroundTertiary }]}
-          onLayout={onLayout}
-        >
-          {/* Fat side (unfilled) - Pink */}
-          <View style={[styles.trackBackground, { backgroundColor: themeColors.fats + '40' }]} />
+          style={[
+            styles.trackFilled,
+            { backgroundColor: themeColors.carbs, width: `${currentPercent}%` },
+          ]}
+        />
 
-          {/* Carb side (filled) - Purple */}
-          <Animated.View
-            style={[
-              styles.trackFilled,
-              { backgroundColor: themeColors.carbs },
-              filledTrackStyle,
-            ]}
-          />
-
-          {/* Thumb */}
-          <Animated.View
-            style={[
-              styles.thumb,
-              { backgroundColor: themeColors.background, borderColor: themeColors.primary },
-              thumbStyle,
-            ]}
-          />
-        </View>
-      </GestureDetector>
+        {/* Thumb */}
+        <View
+          style={[
+            styles.thumb,
+            {
+              backgroundColor: themeColors.background,
+              borderColor: themeColors.primary,
+              transform: [{ translateX: thumbPosition }, { scale: isDragging ? 1.15 : 1 }],
+            },
+          ]}
+        />
+      </View>
 
       {/* Gram display */}
       <View style={styles.gramsContainer}>

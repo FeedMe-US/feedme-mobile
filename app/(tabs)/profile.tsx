@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Platform, Linking } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Platform, Linking, Text as RNText } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors, spacing, radius } from '@/src/theme';
 import { Screen } from '@/src/ui/Screen';
@@ -60,6 +60,22 @@ export default function ProfileScreen() {
   const [proteinLocked, setProteinLocked] = useState(true); // Protein auto-calculates by default
 
   const dietaryRestrictions = ['Vegetarian', 'Vegan', 'Pescatarian', 'Halal', 'Kosher', 'Gluten-free', 'None'];
+
+  // Mapping between display names and backend keys for micronutrients
+  const vitaminDisplayToKey: Record<string, string> = {
+    'Vitamin D': 'vitamin_d_mcg',
+    'Vitamin B12': 'vitamin_b12_mcg',
+    'Vitamin C': 'vitamin_c_mg',
+    'Iron': 'iron_mg',
+    'Calcium': 'calcium_mg',
+    'Potassium': 'potassium_mg',
+    'Vitamin A': 'vitamin_a_mcg',
+    'Vitamin B6': 'vitamin_b6_mg',
+  };
+  const vitaminKeyToDisplay: Record<string, string> = Object.fromEntries(
+    Object.entries(vitaminDisplayToKey).map(([k, v]) => [v, k])
+  );
+
   const diningHalls = [
     // Hill & residential dining halls (canonical names matching database)
     'De Neve Dining',
@@ -84,13 +100,14 @@ export default function ProfileScreen() {
     'LuValle: Northern Lights Poke',
     'LuValle: Northern Lights Panini',
   ];
-  const vitamins = ['Vit D', 'B12', 'Iron', 'Calcium', 'Magnesium'];
+  // Micronutrients available from backend (matching nutrition table columns)
+  const vitamins = ['Vitamin D', 'Vitamin B12', 'Vitamin C', 'Iron', 'Calcium', 'Potassium', 'Vitamin A', 'Vitamin B6'];
   const goalTypes = ['Cut', 'Maintain', 'Lean Muscle Growth', 'Bulk'];
 
   const [selectedRestrictions, setSelectedRestrictions] = useState<string[]>([]);
   const [dislikedFoods, setDislikedFoods] = useState<string[]>([]);
   const [selectedHalls, setSelectedHalls] = useState<string[]>(['BPlate', 'De Neve Dining']);
-  const [selectedVitamins, setSelectedVitamins] = useState<string[]>(['Vit D', 'B12', 'Iron']);
+  const [selectedVitamins, setSelectedVitamins] = useState<string[]>(['Vitamin D', 'Vitamin B12', 'Iron']);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Notification reminder times (when notifications fire)
@@ -183,6 +200,7 @@ export default function ProfileScreen() {
             dietary_restrictions?: string[];
             allergen_exclusions?: string[];
             preferred_locations?: number[];
+            tracked_micronutrients?: string[];
             targets?: {
               daily_calories: number;
               daily_protein_g: number;
@@ -255,6 +273,13 @@ export default function ProfileScreen() {
                 carbs: profile.targets.daily_carbs_g,
                 fats: profile.targets.daily_fat_g,
               });
+            }
+            // Load tracked micronutrients from backend (map keys to display names)
+            if (profile.tracked_micronutrients?.length) {
+              const mappedVitamins = profile.tracked_micronutrients
+                .map(key => vitaminKeyToDisplay[key])
+                .filter(Boolean) as string[];
+              if (mappedVitamins.length > 0) setSelectedVitamins(mappedVitamins);
             }
             setIsInitialLoad(false);
             return; // Backend data loaded successfully
@@ -440,11 +465,30 @@ export default function ProfileScreen() {
     savePreferredHalls();
   }, [selectedHalls, isAuthenticated, isInitialLoad]);
 
-  // Save selected vitamins when they change
+  // Save selected vitamins when they change - sync to backend and local storage
   React.useEffect(() => {
     if (isInitialLoad) return;
-    saveOnboardingData({ selectedVitamins });
-  }, [selectedVitamins, isInitialLoad]);
+
+    const saveVitamins = async () => {
+      // Save to local storage (display names)
+      await saveOnboardingData({ selectedVitamins });
+
+      // Sync to backend if authenticated (convert to backend keys)
+      if (isAuthenticated) {
+        const trackedKeys = selectedVitamins
+          .map(name => vitaminDisplayToKey[name])
+          .filter(Boolean) as string[];
+
+        try {
+          await userService.updateProfile({ tracked_micronutrients: trackedKeys });
+        } catch (error) {
+          console.warn('[profile] Failed to sync tracked vitamins to backend:', error);
+        }
+      }
+    };
+
+    saveVitamins();
+  }, [selectedVitamins, isInitialLoad, isAuthenticated]);
 
   const toggleSelection = (
     item: string,
@@ -803,6 +847,7 @@ export default function ProfileScreen() {
     }
   };
 
+  // Original return restored
   return (
     <Screen safeBottom={false}>
       <ScrollView
@@ -1277,7 +1322,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Carb/Fat Ratio Slider - Only show when not using fully custom targets */}
+          {/* Carb/Fat Ratio Slider - Now using PanResponder (fixed crash) */}
           {!useCustomTargets && (
             <View style={styles.carbFatSliderSection}>
               <CarbFatSlider

@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logService } from '@/src/services/logService';
+import type { MicronutrientProgress } from '@/src/types/api';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
@@ -51,6 +52,8 @@ export interface DailyTracking {
   targets: DailyTargets;
   unit: 'g' | '%';
   loggedMeals: LoggedMeal[];
+  /** Progress for user's tracked micronutrients */
+  micronutrients: MicronutrientProgress[];
   isSyncing: boolean;
   lastSyncError: string | null;
 }
@@ -84,6 +87,7 @@ const defaultTracking: DailyTracking = {
   targets: defaultTargets,
   unit: 'g',
   loggedMeals: [],
+  micronutrients: [],
   isSyncing: false,
   lastSyncError: null,
 };
@@ -240,9 +244,12 @@ export function DailyTrackingProvider({ children }: { children: ReactNode }) {
 
     try {
       const today = new Date().toISOString().split('T')[0];
-      const logs = await logService.getLogsForDate(today);
+      // Use getDailyTracking to get the full response with micronutrients
+      const dailyData = await logService.getDailyTracking(today);
 
-      if (logs.length > 0) {
+      if (dailyData) {
+        const logs = dailyData.entries || [];
+
         // Convert backend FoodLogEntry[] to LoggedMeal format
         // Each entry is a flat object with food_name, servings, etc.
         const meals: LoggedMeal[] = logs.map((entry) => ({
@@ -259,10 +266,15 @@ export function DailyTrackingProvider({ children }: { children: ReactNode }) {
           backendId: String(entry.id),
         }));
 
+        // Get micronutrient progress from the API response
+        // API returns micronutrients as array of MicronutrientProgress
+        const micronutrients = (dailyData as { micronutrients?: MicronutrientProgress[] }).micronutrients || [];
+
         setTracking((prev) => ({
           ...prev,
           loggedMeals: meals,
           consumed: recalculateConsumed(meals),
+          micronutrients,
           isSyncing: false,
           lastSyncError: null,
         }));

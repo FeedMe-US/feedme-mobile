@@ -51,6 +51,7 @@ function AuthAndOnboardingGate({ children }: { children: React.ReactNode }) {
           console.log('[AuthGate] DEV build - using LOCAL onboarding flag only (ignoring backend profile)');
           const onboardingComplete = await getOnboardingComplete();
           console.log('[AuthGate] DEV - Local onboarding flag:', onboardingComplete);
+          console.log('[AuthGate] DEV - isAuthenticated:', isAuthenticated);
           console.log('[AuthGate] DEV - Current route:', currentRoute);
           console.log('[AuthGate] DEV - All segments:', segments);
 
@@ -64,10 +65,16 @@ function AuthAndOnboardingGate({ children }: { children: React.ReactNode }) {
             if (!isOnboardingRoute) {
               router.replace('/(onboarding)/goal');
             }
+          } else if (!isAuthenticated) {
+            // Onboarding complete but not logged in - go to login
+            console.log('[AuthGate] DEV - Onboarding complete but NOT authenticated, redirecting to login');
+            if (!isAuthRoute) {
+              router.replace('/(auth)/login');
+            }
           } else {
-            // Onboarding complete - go to tabs (main app)
-            if (!isTabsRoute && !isAuthRoute) {
-              console.log('[AuthGate] DEV - Onboarding complete, redirecting to tabs');
+            // Onboarding complete AND authenticated - go to tabs (main app)
+            if (!isTabsRoute) {
+              console.log('[AuthGate] DEV - Onboarding complete AND authenticated, redirecting to tabs');
               router.replace('/(tabs)');
             }
           }
