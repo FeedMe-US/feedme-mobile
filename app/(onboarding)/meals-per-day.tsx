@@ -55,7 +55,7 @@ export default function MealsPerDayScreen() {
               How many meals do you eat a day?
             </Text>
             <Text variant="body" color="secondary" style={styles.subtitle}>
-              We'll distribute your nutrition goals accordingly
+              We&apos;ll distribute your nutrition goals accordingly
             </Text>
           </View>
 

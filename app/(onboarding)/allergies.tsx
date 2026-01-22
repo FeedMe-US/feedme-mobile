@@ -100,7 +100,7 @@ export default function AllergiesScreen() {
                 Any allergies?
               </Text>
               <Text variant="body" color="secondary" style={styles.subtitle}>
-                We'll make sure to filter these out
+                We&apos;ll make sure to filter these out
               </Text>
             </View>
 

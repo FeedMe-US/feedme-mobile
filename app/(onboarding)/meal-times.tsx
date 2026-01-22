@@ -114,7 +114,7 @@ export default function MealTimesScreen() {
               When do you usually eat?
             </Text>
             <Text variant="body" color="secondary" style={styles.subtitle}>
-              We'll send you reminders at these times
+              We&apos;ll send you reminders at these times
             </Text>
           </View>
 

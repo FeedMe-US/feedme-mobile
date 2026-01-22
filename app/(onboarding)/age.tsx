@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView as RNScrollView, Dimensions, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { colors, spacing, radius } from '@/src/theme';
+import { colors, spacing } from '@/src/theme';
 import { Text } from '@/src/ui/Text';
 import { Button } from '@/src/ui/Button';
 import { Screen } from '@/src/ui/Screen';
@@ -65,7 +65,6 @@ export default function AgeScreen() {
     ages.push(i);
   }
 
-  const screenHeight = Dimensions.get('window').height;
   const visibleItems = 5;
   const paddingTop = (visibleItems - 1) / 2 * ITEM_HEIGHT;
   const paddingBottom = (visibleItems - 1) / 2 * ITEM_HEIGHT;
