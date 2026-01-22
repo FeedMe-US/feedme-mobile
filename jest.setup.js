@@ -21,6 +21,3 @@ jest.mock('expo-router', () => ({
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
-
-// Extend expect with testing-library matchers
-import '@testing-library/react-native/extend-expect';

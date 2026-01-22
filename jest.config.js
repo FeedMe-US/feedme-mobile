@@ -3,13 +3,11 @@
  *
  * This configuration sets up Jest with React Native Testing Library
  * for component and integration testing.
- *
- * Note: Using jest-expo/ios preset for Expo 54 compatibility.
  */
 
 module.exports = {
-  // Use iOS preset for Expo 54 compatibility
-  preset: 'jest-expo/ios',
+  // Use jest-expo preset
+  preset: 'jest-expo',
 
   // Setup files run before each test
   setupFilesAfterEnv: [
@@ -19,9 +17,11 @@ module.exports = {
   // Module file extensions
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
 
-  // Module name mapping for path aliases
+  // Module name mapping for path aliases and problematic modules
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    // Map expo winter modules to empty mocks
+    '^expo/src/winter/(.*)$': '<rootDir>/__mocks__/emptyModule.js',
   },
 
   // Test file patterns
