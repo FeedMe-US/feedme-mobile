@@ -16,7 +16,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "api:generate": "powershell -ExecutionPolicy Bypass -File scripts/generate-api-types.ps1",
-    "api:sync": "cd .. && python FeedMe/backend/scripts/export_openapi.py && cd FeedMe && npm run api:generate"
+    "api:fetch": "curl -o shared/openapi.json https://raw.githubusercontent.com/FeedMe-US/feedme-docs/main/api/openapi.json",
+    "api:sync": "npm run api:fetch && npm run api:generate"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

@@ -12,7 +12,7 @@ $OpenApiFile = Join-Path $SharedDir "openapi.json"
 # Check OpenAPI spec exists
 if (-not (Test-Path $OpenApiFile)) {
     Write-Host "Error: $OpenApiFile not found" -ForegroundColor Red
-    Write-Host "Run backend OpenAPI export first: python backend/scripts/export_openapi.py" -ForegroundColor Yellow
+    Write-Host "Run 'npm run api:fetch' to download the OpenAPI spec from feedme-docs" -ForegroundColor Yellow
     exit 1
 }
 
