@@ -91,7 +91,7 @@ export default function IngredientsAvoidScreen() {
               Ingredients you avoid?
             </Text>
             <Text variant="body" color="secondary" style={styles.subtitle}>
-              We won't show you meals with these
+              We won&apos;t show you meals with these
             </Text>
           </View>
 

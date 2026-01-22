@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView as RNScrollView, Dimensions, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { colors, spacing, radius } from '@/src/theme';
+import { colors, spacing } from '@/src/theme';
 import { Text } from '@/src/ui/Text';
 import { Button } from '@/src/ui/Button';
 import { Screen } from '@/src/ui/Screen';
@@ -167,7 +167,7 @@ export default function GoalWeightScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text variant="h1" weight="bold" style={styles.title}>
-            What's your goal weight?
+            What&apos;s your goal weight?
           </Text>
           <Text variant="body" color="secondary" style={styles.subtitle}>
             This helps us personalize your nutrition plan

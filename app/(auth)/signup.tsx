@@ -77,7 +77,7 @@ export default function SignupScreen() {
         Alert.alert('Not Supported', result.message);
         haptics.warning();
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Failed to verify email. Please try again.');
     } finally {
       setIsLoading(false);
@@ -117,7 +117,7 @@ export default function SignupScreen() {
         Alert.alert('Signup Failed', result.error || 'Failed to create account');
         haptics.error();
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Failed to create account. Please try again.');
     } finally {
       setIsLoading(false);

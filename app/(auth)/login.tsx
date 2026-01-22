@@ -57,7 +57,7 @@ export default function LoginScreen() {
         Alert.alert('Not Supported', result.message);
         haptics.warning();
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Failed to verify email. Please try again.');
     } finally {
       setIsLoading(false);
@@ -83,7 +83,7 @@ export default function LoginScreen() {
         Alert.alert('Login Failed', result.error || 'Invalid credentials');
         haptics.error();
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Failed to login. Please try again.');
     } finally {
       setIsLoading(false);
@@ -225,7 +225,7 @@ export default function LoginScreen() {
           {/* Footer */}
           <View style={styles.footer}>
             <Text variant="bodySmall" color="secondary">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
             </Text>
             <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
               <Text variant="bodySmall" style={{ color: themeColors.primary }}>

@@ -956,7 +956,7 @@ export default function ProfileScreen() {
                 Height
               </Text>
               <Text variant="h4" weight="bold" style={styles.metricValue}>
-                {heightFeet}'{heightInches}"
+                {heightFeet}&apos;{heightInches}&quot;
               </Text>
             </TouchableOpacity>
             <TouchableOpacity

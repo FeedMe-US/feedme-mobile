@@ -95,7 +95,7 @@ export default function CompleteScreen() {
 
         {/* Success Message */}
         <Text variant="h1" weight="bold" style={styles.title}>
-          You're all set!
+          You&apos;re all set!
         </Text>
         <Text variant="body" color="secondary" style={styles.subtitle}>
           Your personalized nutrition plan is ready

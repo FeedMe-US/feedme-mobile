@@ -6,7 +6,6 @@ import { colors, spacing, radius } from '@/src/theme';
 import { Text } from '@/src/ui/Text';
 import { Button } from '@/src/ui/Button';
 import { Screen } from '@/src/ui/Screen';
-import { MaterialIcons } from '@expo/vector-icons';
 import { saveOnboardingData } from '@/src/lib/onboardingData';
 
 type GoalOption = 'bulk' | 'lean' | 'maintain' | 'perform';
@@ -64,7 +63,7 @@ export default function GoalScreen() {
           {/* Header */}
           <View style={styles.header}>
             <Text variant="h1" weight="bold" style={styles.title}>
-              What's your current goal?
+              What&apos;s your current goal?
             </Text>
             <Text variant="body" color="secondary" style={styles.subtitle}>
               Choose the goal that best fits your nutrition needs

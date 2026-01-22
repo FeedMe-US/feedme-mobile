@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView as RNScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { colors, spacing, radius } from '@/src/theme';
+import { colors, spacing } from '@/src/theme';
 import { Text } from '@/src/ui/Text';
 import { Button } from '@/src/ui/Button';
 import { Screen } from '@/src/ui/Screen';

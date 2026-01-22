@@ -26,7 +26,7 @@ const { width } = Dimensions.get('window');
 const SWIPE_THRESHOLD = width * 0.22;
 
 // Comprehensive image mapping for accurate meal visuals
-const MEAL_IMAGE_MAP: Array<{ keywords: string[]; url: string }> = [
+const MEAL_IMAGE_MAP: { keywords: string[]; url: string }[] = [
   // Salads
   { keywords: ['salad', 'caesar', 'garden', 'greens', 'lettuce', 'spinach', 'arugula'], url: 'https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg' },
   
