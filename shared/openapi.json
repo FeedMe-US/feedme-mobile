@@ -4,7 +4,7 @@
     "title": "FeedMe API",
     "description": "UCLA dining recommendation engine API",
     "version": "1.0.0",
-    "x-generated-at": "2026-01-21T12:13:02.992467",
+    "x-generated-at": "2026-01-22T01:08:59.308671",
     "x-generator": "export_openapi.py"
   },
   "paths": {
@@ -280,7 +280,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/src__schemas__user__UserProfileResponse"
+                  "$ref": "#/components/schemas/UserProfileResponse"
                 }
               }
             }
@@ -315,7 +315,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/src__schemas__user__UserProfileResponse"
+                  "$ref": "#/components/schemas/UserProfileResponse"
                 }
               }
             }
@@ -1363,6 +1363,103 @@
         }
       }
     },
+    "/admin/generate-embeddings": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Generate embeddings for new food items",
+        "description": "Triggers embedding generation for food items that don't have embeddings yet.\n\n    This endpoint is called by the scraper workflow after new menu items are added.\n    Embeddings are generated in the background to avoid timeout issues.\n\n    Requires X-Admin-Key header for authentication.",
+        "operationId": "generate_embeddings_admin_generate_embeddings_post",
+        "parameters": [
+          {
+            "name": "X-Admin-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-Admin-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateEmbeddingsRequest",
+                "default": {
+                  "batch_size": 100,
+                  "use_enriched": true
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateEmbeddingsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/health": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Admin health check",
+        "description": "Check if admin endpoints are configured and accessible.",
+        "operationId": "admin_health_admin_health_get",
+        "parameters": [
+          {
+            "name": "X-Admin-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-Admin-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Root",
@@ -2391,6 +2488,52 @@
         ],
         "title": "FoodSearchResponse",
         "description": "Food search response."
+      },
+      "GenerateEmbeddingsRequest": {
+        "properties": {
+          "batch_size": {
+            "type": "integer",
+            "title": "Batch Size",
+            "default": 100
+          },
+          "use_enriched": {
+            "type": "boolean",
+            "title": "Use Enriched",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "GenerateEmbeddingsRequest",
+        "description": "Request body for embedding generation."
+      },
+      "GenerateEmbeddingsResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "batch_size": {
+            "type": "integer",
+            "title": "Batch Size"
+          },
+          "use_enriched": {
+            "type": "boolean",
+            "title": "Use Enriched"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "message",
+          "batch_size",
+          "use_enriched"
+        ],
+        "title": "GenerateEmbeddingsResponse",
+        "description": "Response for embedding generation."
       },
       "HTTPValidationError": {
         "properties": {
@@ -4027,6 +4170,184 @@
         "title": "UniversityInfo",
         "description": "University information returned from detection."
       },
+      "UserProfileResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "male",
+                  "female"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sex"
+          },
+          "height_inches": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Inches"
+          },
+          "weight_lbs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Lbs"
+          },
+          "activity_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Level"
+          },
+          "goal_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Type"
+          },
+          "dietary_restrictions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dietary Restrictions"
+          },
+          "allergen_exclusions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allergen Exclusions"
+          },
+          "preferred_locations": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Preferred Locations"
+          },
+          "onboarding_complete": {
+            "type": "boolean",
+            "title": "Onboarding Complete",
+            "default": false
+          },
+          "targets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserTargetsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meal_pattern": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealPatternResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "macros_custom_override": {
+            "type": "boolean",
+            "title": "Macros Custom Override",
+            "default": false
+          },
+          "carb_fat_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carb Fat Ratio"
+          },
+          "protein_locked": {
+            "type": "boolean",
+            "title": "Protein Locked",
+            "default": true
+          },
+          "protein_multiplier": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Multiplier"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email"
+        ],
+        "title": "UserProfileResponse",
+        "description": "Response for GET /user/profile."
+      },
       "UserProfileUpdateRequest": {
         "properties": {
           "age": {
@@ -4619,184 +4940,6 @@
         ],
         "title": "UserProfileResponse",
         "description": "User profile with university info."
-      },
-      "src__schemas__user__UserProfileResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "email": {
-            "type": "string",
-            "title": "Email"
-          },
-          "age": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Age"
-          },
-          "sex": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "male",
-                  "female"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sex"
-          },
-          "height_inches": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Height Inches"
-          },
-          "weight_lbs": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Weight Lbs"
-          },
-          "activity_level": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Activity Level"
-          },
-          "goal_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Goal Type"
-          },
-          "dietary_restrictions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Dietary Restrictions"
-          },
-          "allergen_exclusions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Allergen Exclusions"
-          },
-          "preferred_locations": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
-            "title": "Preferred Locations"
-          },
-          "onboarding_complete": {
-            "type": "boolean",
-            "title": "Onboarding Complete",
-            "default": false
-          },
-          "targets": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserTargetsResponse"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "meal_pattern": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/MealPatternResponse"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "macros_custom_override": {
-            "type": "boolean",
-            "title": "Macros Custom Override",
-            "default": false
-          },
-          "carb_fat_ratio": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Carb Fat Ratio"
-          },
-          "protein_locked": {
-            "type": "boolean",
-            "title": "Protein Locked",
-            "default": true
-          },
-          "protein_multiplier": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Protein Multiplier"
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "email"
-        ],
-        "title": "UserProfileResponse",
-        "description": "Response for GET /user/profile."
       }
     },
     "securitySchemes": {

@@ -680,6 +680,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/generate-embeddings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate embeddings for new food items
+         * @description Triggers embedding generation for food items that don't have embeddings yet.
+         *
+         *         This endpoint is called by the scraper workflow after new menu items are added.
+         *         Embeddings are generated in the background to avoid timeout issues.
+         *
+         *         Requires X-Admin-Key header for authentication.
+         */
+        post: operations["generate_embeddings_admin_generate_embeddings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin health check
+         * @description Check if admin endpoints are configured and accessible.
+         */
+        get: operations["admin_health_admin_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -1230,6 +1275,36 @@ export interface components {
             foods: components["schemas"]["FoodSearchItem"][];
             /** Error */
             error?: string | null;
+        };
+        /**
+         * GenerateEmbeddingsRequest
+         * @description Request body for embedding generation.
+         */
+        GenerateEmbeddingsRequest: {
+            /**
+             * Batch Size
+             * @default 100
+             */
+            batch_size: number;
+            /**
+             * Use Enriched
+             * @default true
+             */
+            use_enriched: boolean;
+        };
+        /**
+         * GenerateEmbeddingsResponse
+         * @description Response for embedding generation.
+         */
+        GenerateEmbeddingsResponse: {
+            /** Status */
+            status: string;
+            /** Message */
+            message: string;
+            /** Batch Size */
+            batch_size: number;
+            /** Use Enriched */
+            use_enriched: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1910,6 +1985,57 @@ export interface components {
             is_supported: boolean;
         };
         /**
+         * UserProfileResponse
+         * @description Response for GET /user/profile.
+         */
+        UserProfileResponse: {
+            /** Id */
+            id: string;
+            /** Email */
+            email: string;
+            /** Age */
+            age?: number | null;
+            /** Sex */
+            sex?: ("male" | "female") | null;
+            /** Height Inches */
+            height_inches?: number | null;
+            /** Weight Lbs */
+            weight_lbs?: number | null;
+            /** Activity Level */
+            activity_level?: string | null;
+            /** Goal Type */
+            goal_type?: string | null;
+            /** Dietary Restrictions */
+            dietary_restrictions?: string[];
+            /** Allergen Exclusions */
+            allergen_exclusions?: string[];
+            /** Preferred Locations */
+            preferred_locations?: number[];
+            /**
+             * Onboarding Complete
+             * @default false
+             */
+            onboarding_complete: boolean;
+            targets?: components["schemas"]["UserTargetsResponse"] | null;
+            meal_pattern?: components["schemas"]["MealPatternResponse"] | null;
+            /**
+             * Macros Custom Override
+             * @default false
+             */
+            macros_custom_override: boolean;
+            /** Carb Fat Ratio */
+            carb_fat_ratio?: number | null;
+            /**
+             * Protein Locked
+             * @default true
+             */
+            protein_locked: boolean;
+            /** Protein Multiplier */
+            protein_multiplier?: number | null;
+            /** Created At */
+            created_at?: string | null;
+        };
+        /**
          * UserProfileUpdateRequest
          * @description Request body for PUT /user/profile.
          */
@@ -2090,57 +2216,6 @@ export interface components {
             university_slug?: string | null;
             /** University Name */
             university_name?: string | null;
-        };
-        /**
-         * UserProfileResponse
-         * @description Response for GET /user/profile.
-         */
-        src__schemas__user__UserProfileResponse: {
-            /** Id */
-            id: string;
-            /** Email */
-            email: string;
-            /** Age */
-            age?: number | null;
-            /** Sex */
-            sex?: ("male" | "female") | null;
-            /** Height Inches */
-            height_inches?: number | null;
-            /** Weight Lbs */
-            weight_lbs?: number | null;
-            /** Activity Level */
-            activity_level?: string | null;
-            /** Goal Type */
-            goal_type?: string | null;
-            /** Dietary Restrictions */
-            dietary_restrictions?: string[];
-            /** Allergen Exclusions */
-            allergen_exclusions?: string[];
-            /** Preferred Locations */
-            preferred_locations?: number[];
-            /**
-             * Onboarding Complete
-             * @default false
-             */
-            onboarding_complete: boolean;
-            targets?: components["schemas"]["UserTargetsResponse"] | null;
-            meal_pattern?: components["schemas"]["MealPatternResponse"] | null;
-            /**
-             * Macros Custom Override
-             * @default false
-             */
-            macros_custom_override: boolean;
-            /** Carb Fat Ratio */
-            carb_fat_ratio?: number | null;
-            /**
-             * Protein Locked
-             * @default true
-             */
-            protein_locked: boolean;
-            /** Protein Multiplier */
-            protein_multiplier?: number | null;
-            /** Created At */
-            created_at?: string | null;
         };
     };
     responses: never;
@@ -2337,7 +2412,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["src__schemas__user__UserProfileResponse"];
+                    "application/json": components["schemas"]["UserProfileResponse"];
                 };
             };
         };
@@ -2361,7 +2436,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["src__schemas__user__UserProfileResponse"];
+                    "application/json": components["schemas"]["UserProfileResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3066,6 +3141,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FoodSearchItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_embeddings_admin_generate_embeddings_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Admin-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["GenerateEmbeddingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerateEmbeddingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_health_admin_health_get: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Admin-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
