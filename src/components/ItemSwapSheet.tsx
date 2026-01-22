@@ -227,7 +227,7 @@ export function ItemSwapSheet({
                     color={themeColors.textTertiary}
                   />
                   <Text variant="body" color="secondary" style={{ marginTop: spacing.md }}>
-                    No items found for "{searchQuery}"
+                    No items found for &quot;{searchQuery}&quot;
                   </Text>
                 </View>
               }
