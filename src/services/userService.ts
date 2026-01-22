@@ -13,6 +13,7 @@ import type {
   ProgressResponse,
   UserProfileResponse,
   UserProfileUpdateRequest,
+  UserProfileUpdateRequestExtended,
   AdjustedTargetsResponse,
 } from '@/src/types/api';
 
@@ -233,7 +234,7 @@ export const userService = {
    * Update user profile (includes preferences)
    * PUT /user/profile
    */
-  async updateProfile(updates: UserProfileUpdateRequest): Promise<UserProfileResponse | null> {
+  async updateProfile(updates: UserProfileUpdateRequestExtended): Promise<UserProfileResponse | null> {
     try {
       const response = await apiClient.put<UserProfileResponse>('/user/profile', updates);
 

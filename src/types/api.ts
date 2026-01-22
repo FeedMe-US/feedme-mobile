@@ -104,6 +104,11 @@ export interface MicronutrientProgress {
   pct: number;
 }
 
+/** Extended profile update request including micronutrient tracking */
+export type UserProfileUpdateRequestExtended = UserProfileUpdateRequest & {
+  tracked_micronutrients?: string[];
+};
+
 // === Preference Types ===
 export type ThumbsUpRequest = Schemas['ThumbsUpRequest'];
 export type ThumbsUpResponse = Schemas['ThumbsUpResponse'];

@@ -7,4 +7,6 @@ export { ProgressIcon } from './ProgressIcon';
 export { ProfileIcon } from './ProfileIcon';
 export { DiaryIcon } from './DiaryIcon';
 export { RefreshIcon } from './RefreshIcon';
+export { LockIcon } from './LockIcon';
+export { PlateIcon } from './PlateIcon';
 

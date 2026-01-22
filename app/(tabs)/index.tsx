@@ -17,10 +17,10 @@ import { Text } from '@/src/ui/Text';
 import { Button } from '@/src/ui/Button';
 import { haptics } from '@/src/utils/haptics';
 import { formatCalories, formatMacro } from '@/src/utils/formatNutrition';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, TextInput, ActivityIndicator } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, TextInput, ActivityIndicator, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { userService } from '@/src/services/userService';
 import { getOnboardingData } from '@/src/lib/onboardingData';
 import type { DiningHall } from '@/src/services/mealService';
@@ -29,6 +29,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light']; // Default to light for Neumorphism
   const router = useRouter();
+  const params = useLocalSearchParams();
   const { tracking, addMeal, refreshFromBackend } = useDailyTracking();
 
   // Hall selection state - default to "Any Hill" mode so content shows on scroll
@@ -44,6 +45,8 @@ export default function HomeScreen() {
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [recommendedMeal, setRecommendedMeal] = useState<MealRecommendation | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const lastGenerationKey = useRef<string>('');
 
   const [likedMeals, setLikedMeals] = useState<Set<string>>(new Set());
   const [greeting, setGreeting] = useState('Good Evening');
@@ -51,23 +54,25 @@ export default function HomeScreen() {
   const scrollPositionRef = useRef<number>(0);
   const hasLoadedOnce = useRef(false);
 
+  // Modal state for craving selection
+  const [showCravingModal, setShowCravingModal] = useState(false);
+
   // Mood suggestion chips
   const moodSuggestions = ['High protein', 'Light meal', 'Comfort food', 'Spicy'];
 
-  // Set greeting based on time
-  useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) setGreeting('Good Morning');
-    else if (hour < 17) setGreeting('Good Afternoon');
-    else setGreeting('Good Evening');
+  // Get current/next meal period based on time
+  const getCurrentMealPeriod = useCallback((): MealPeriod => {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      hour: '2-digit',
+      hour12: false,
+    });
+    const hour = parseInt(formatter.formatToParts(new Date()).find(p => p.type === 'hour')?.value || '12', 10);
+    if (hour >= 5 && hour < 11) return 'breakfast';
+    if (hour >= 11 && hour < 16) return 'lunch';
+    if (hour >= 16 && hour < 21) return 'dinner';
+    return 'late_night';
   }, []);
-
-  // Refresh daily tracking (including micronutrients) when screen gains focus
-  useFocusEffect(
-    useCallback(() => {
-      refreshFromBackend();
-    }, [refreshFromBackend])
-  );
 
   // Get available periods for the current selection
   const getAvailablePeriods = useCallback((): MealPeriod[] => {
@@ -85,22 +90,8 @@ export default function HomeScreen() {
     return ['breakfast', 'lunch', 'dinner', 'late_night'];
   }, [selectedHallMode, selectedHallSlug, diningHallsData]);
 
-  // Get current/next meal period based on time
-  const getCurrentMealPeriod = useCallback((): MealPeriod => {
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Los_Angeles',
-      hour: '2-digit',
-      hour12: false,
-    });
-    const hour = parseInt(formatter.formatToParts(new Date()).find(p => p.type === 'hour')?.value || '12', 10);
-    if (hour >= 5 && hour < 11) return 'breakfast';
-    if (hour >= 11 && hour < 16) return 'lunch';
-    if (hour >= 16 && hour < 21) return 'dinner';
-    return 'late_night';
-  }, []);
-
-  // Handle generate button press
-  const handleGenerate = async () => {
+  // Handle generate recommendation
+  const handleGenerate = useCallback(async (includeMood: boolean = true) => {
     if (!selectedMealPeriod) return;
     if (selectedHallMode === 'specific' && !selectedHallSlug) return;
 
@@ -110,7 +101,7 @@ export default function HomeScreen() {
         selectedHallSlug,
         selectedMealPeriod,
         {
-          mood: moodText || undefined,
+          mood: includeMood ? (moodText || undefined) : undefined,
           mode: selectedHallMode,
         }
       );
@@ -118,11 +109,98 @@ export default function HomeScreen() {
       haptics.success();
     } catch (error) {
       console.error('Failed to generate recommendation:', error);
-      Alert.alert('Error', 'Failed to generate recommendation. Please try again.');
+      // Don't show alert on auto-generation, only on manual refresh
+      if (!isInitialized) {
+        // Silently fail on initial load
+        console.warn('[Home] Initial recommendation generation failed, will retry when user interacts');
+      }
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [selectedMealPeriod, selectedHallMode, selectedHallSlug, moodText, isInitialized]);
+
+  // Set greeting based on time
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting('Good Morning');
+    else if (hour < 17) setGreeting('Good Afternoon');
+    else setGreeting('Good Evening');
+  }, []);
+
+  // Refresh daily tracking (including micronutrients) when screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      refreshFromBackend();
+    }, [refreshFromBackend])
+  );
+
+  // Handle navigation from menu with built plate
+  useEffect(() => {
+    if (params.buildPlate === 'true' && params.recommendation && params.hallSlug && params.mealPeriod) {
+      try {
+        const recommendation = JSON.parse(params.recommendation as string) as MealRecommendation;
+        const hallSlug = params.hallSlug as string;
+        const mealPeriod = params.mealPeriod as MealPeriod;
+        
+        // Set the dining hall selection
+        setSelectedHallMode('specific');
+        setSelectedHallSlug(hallSlug);
+        setSelectedMealPeriod(mealPeriod);
+        
+        // Set the recommendation directly (skip auto-generation)
+        setRecommendedMeal(recommendation);
+        setIsInitialized(true);
+        
+        // Update generation key to prevent auto-regeneration
+        lastGenerationKey.current = `specific-${hallSlug}-${mealPeriod}-from-menu`;
+        
+        // Clear params to prevent re-triggering
+        router.setParams({ 
+          buildPlate: undefined, 
+          recommendation: undefined, 
+          hallSlug: undefined, 
+          mealPeriod: undefined,
+          hallName: undefined 
+        });
+        
+        // Scroll to bottom to show the meal card
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 500); // Delay to ensure the meal card is rendered
+        
+        haptics.success();
+      } catch (error) {
+        console.error('Failed to parse recommendation from params:', error);
+      }
+    }
+  }, [params, router]);
+
+  // Auto-select "Any Hill" and current meal period on mount
+  useEffect(() => {
+    if (!isInitialized && diningHalls.length > 0 && params.buildPlate !== 'true') {
+      setSelectedHallMode('hill');
+      setSelectedHallSlug(null);
+      const currentPeriod = getCurrentMealPeriod();
+      setSelectedMealPeriod(currentPeriod);
+      setIsInitialized(true);
+    }
+  }, [diningHalls.length, isInitialized, getCurrentMealPeriod, params.buildPlate]);
+
+  // Auto-generate recommendation when hall or meal period changes (but not mood)
+  useEffect(() => {
+    if (!isInitialized) return;
+    if (!selectedMealPeriod) return;
+    if (selectedHallMode === 'specific' && !selectedHallSlug) return;
+
+    // Create a key for this combination (excluding mood)
+    const generationKey = `${selectedHallMode}-${selectedHallSlug || 'none'}-${selectedMealPeriod}`;
+    
+    // Only generate if the key changed (hall or period changed, not mood)
+    if (generationKey !== lastGenerationKey.current) {
+      lastGenerationKey.current = generationKey;
+      handleGenerate(false); // Don't include mood in auto-generation
+    }
+  }, [selectedHallMode, selectedHallSlug, selectedMealPeriod, isInitialized, handleGenerate]);
 
   // Handle mood chip tap
   const handleMoodChipTap = (suggestion: string) => {
@@ -393,7 +471,10 @@ useFocusEffect(
 
   const handleRefresh = () => {
     haptics.medium();
-    handleGenerate();
+    // Force regeneration by updating the key
+    const generationKey = `${selectedHallMode}-${selectedHallSlug || 'none'}-${selectedMealPeriod}`;
+    lastGenerationKey.current = generationKey + '-refresh';
+    handleGenerate(true);
   };
 
   const handleRingPress = () => {
@@ -566,31 +647,29 @@ useFocusEffect(
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.diningHallChips}>
+              contentContainerStyle={[styles.diningHallChips, { paddingLeft: spacing.lg, paddingRight: spacing.lg }]}>
               {/* Special mode chips first */}
               <Chip
                 key="any-hill"
-                label="Any Hill"
+                label="Dining Halls"
                 selected={selectedHallMode === 'hill'}
                 onPress={() => {
                   haptics.light();
                   setSelectedHallMode('hill');
                   setSelectedHallSlug(null);
-                  setSelectedMealPeriod(getCurrentMealPeriod());
-                  setRecommendedMeal(null);
+                  // Auto-generate will happen via useEffect
                 }}
                 style={styles.diningHallChip}
               />
               <Chip
                 key="any-campus"
-                label="Any Campus"
+                label="Campus Spots"
                 selected={selectedHallMode === 'campus'}
                 onPress={() => {
                   haptics.light();
                   setSelectedHallMode('campus');
                   setSelectedHallSlug(null);
-                  setSelectedMealPeriod(getCurrentMealPeriod());
-                  setRecommendedMeal(null);
+                  // Auto-generate will happen via useEffect
                 }}
                 style={styles.diningHallChip}
               />
@@ -644,8 +723,7 @@ useFocusEffect(
                       haptics.light();
                       setSelectedHallMode('specific');
                       setSelectedHallSlug(hallSlug);
-                      setSelectedMealPeriod(getCurrentMealPeriod());
-                      setRecommendedMeal(null);
+                      // Auto-generate will happen via useEffect
                     }}
                     style={chipStyle}
                   />
@@ -664,7 +742,7 @@ useFocusEffect(
           </Card>
         )}
 
-        {/* Meal Period Selector - only show after hall is selected */}
+        {/* Meal Period Selector - always show when Any Hill/Campus is selected or specific hall is selected */}
         {(selectedHallSlug || selectedHallMode !== 'specific') && (
           <View style={styles.mealPeriodSection}>
             <View style={styles.sectionLabel}>
@@ -675,7 +753,7 @@ useFocusEffect(
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.mealPeriodChips}>
+              contentContainerStyle={[styles.mealPeriodChips, { paddingLeft: spacing.lg, paddingRight: spacing.lg }]}>
               {getAvailablePeriods().map((period) => {
                 const periodLabels: Record<MealPeriod, string> = {
                   breakfast: 'Breakfast',
@@ -691,6 +769,7 @@ useFocusEffect(
                     onPress={() => {
                       haptics.selection();
                       setSelectedMealPeriod(period);
+                      // Auto-generate will happen via useEffect
                     }}
                     style={styles.mealPeriodChip}
                   />
@@ -700,74 +779,17 @@ useFocusEffect(
           </View>
         )}
 
-        {/* Mood Input Section - only show after meal period is selected */}
-        {selectedMealPeriod && (
-          <View style={styles.moodSection}>
-            <View style={styles.sectionLabel}>
-              <Text variant="h4" weight="semibold">
-                What are you craving?
-              </Text>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.moodChips}>
-              {moodSuggestions.map((suggestion) => (
-                <Chip
-                  key={suggestion}
-                  label={suggestion}
-                  selected={moodText.includes(suggestion)}
-                  onPress={() => handleMoodChipTap(suggestion)}
-                  style={styles.moodChip}
-                />
-              ))}
-            </ScrollView>
-            <View style={styles.moodInputContainer}>
-              <TextInput
-                style={[
-                  styles.moodInput,
-                  {
-                    backgroundColor: themeColors.surface,
-                    color: themeColors.text,
-                    borderColor: themeColors.border,
-                  }
-                ]}
-                placeholder="What are you craving? (optional)"
-                placeholderTextColor={themeColors.textTertiary}
-                value={moodText}
-                onChangeText={setMoodText}
-                multiline={false}
-              />
-              {moodText.length > 0 && (
-                <TouchableOpacity
-                  style={styles.clearButton}
-                  onPress={() => {
-                    haptics.light();
-                    setMoodText('');
-                  }}>
-                  <Text variant="bodySmall" color="secondary">Clear</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+        {/* Recommended Meal Card - show loading state or meal card */}
+        {isGenerating && !recommendedMeal ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={themeColors.primary} />
+            <Text variant="body" color="secondary" style={styles.loadingText}>
+              Generating your meal...
+            </Text>
           </View>
-        )}
+        ) : null}
 
-        {/* Generate Button - only show after meal period is selected */}
-        {selectedMealPeriod && (
-          <View style={styles.generateSection}>
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              loading={isGenerating}
-              disabled={!selectedMealPeriod || (selectedHallMode === 'specific' && !selectedHallSlug)}
-              onPress={handleGenerate}>
-              Generate Recommendation
-            </Button>
-          </View>
-        )}
-
-        {/* Recommended Meal Card - only show after recommendation is generated */}
+        {/* Recommended Meal Card */}
         {recommendedMeal && (
           <MealCard
             diningHall={recommendedMeal.diningHall}
@@ -817,6 +839,135 @@ useFocusEffect(
             isLiked={recommendedMeal ? likedMeals.has(`${recommendedMeal.diningHall}-${recommendedMeal.calories}`) : false}
           />
         )}
+
+        {/* Craving Button - below meal card */}
+        {recommendedMeal && (
+          <View style={styles.cravingButtonSection}>
+            <Button
+              variant="secondary"
+              size="md"
+              fullWidth
+              onPress={() => {
+                haptics.light();
+                setShowCravingModal(true);
+              }}>
+              Craving something specific?
+            </Button>
+          </View>
+        )}
+
+        {/* Craving Modal */}
+        <Modal
+          visible={showCravingModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowCravingModal(false)}>
+          <KeyboardAvoidingView
+            style={styles.modalOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setShowCravingModal(false)}>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={(e) => e.stopPropagation()}
+                style={[styles.modalContent, { backgroundColor: themeColors.surface }]}>
+                <ScrollView
+                  style={styles.modalScrollContent}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}>
+                  <View style={styles.modalHeader}>
+                    <Text variant="h3" weight="semibold">
+                      What are you craving?
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        haptics.light();
+                        setShowCravingModal(false);
+                      }}
+                      style={styles.modalCloseButton}>
+                      <Text variant="h4" color="secondary">✕</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.modalMoodChips}>
+                    {moodSuggestions.map((suggestion) => (
+                      <Chip
+                        key={suggestion}
+                        label={suggestion}
+                        selected={moodText.includes(suggestion)}
+                        onPress={() => handleMoodChipTap(suggestion)}
+                        style={styles.moodChip}
+                      />
+                    ))}
+                  </ScrollView>
+
+                  <View style={styles.modalInputContainer}>
+                    <TextInput
+                      style={[
+                        styles.moodInput,
+                        {
+                          backgroundColor: themeColors.background,
+                          color: themeColors.text,
+                          borderColor: themeColors.border,
+                        }
+                      ]}
+                      placeholder="What are you craving? (optional)"
+                      placeholderTextColor={themeColors.textTertiary}
+                      value={moodText}
+                      onChangeText={setMoodText}
+                      multiline={false}
+                    />
+                    {moodText.length > 0 && (
+                      <TouchableOpacity
+                        style={styles.clearButton}
+                        onPress={() => {
+                          haptics.light();
+                          setMoodText('');
+                        }}>
+                        <Text variant="bodySmall" color="secondary">Clear</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  <View style={styles.modalActions}>
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      fullWidth
+                      onPress={() => {
+                        haptics.light();
+                        setShowCravingModal(false);
+                      }}
+                      style={styles.modalCancelButton}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="md"
+                      fullWidth
+                      onPress={async () => {
+                        haptics.success();
+                        setShowCravingModal(false);
+                        // Regenerate with new mood - update the generation key to force regeneration
+                        const generationKey = `${selectedHallMode}-${selectedHallSlug || 'none'}-${selectedMealPeriod}`;
+                        lastGenerationKey.current = generationKey + '-mood-updated';
+                        await handleGenerate(true);
+                      }}
+                      style={styles.modalApplyButton}>
+                      Apply
+                    </Button>
+                  </View>
+                </ScrollView>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </Modal>
       </ScrollView>
       </View>
     </Screen>
@@ -859,7 +1010,6 @@ const styles = StyleSheet.create({
   },
   diningHallChips: {
     gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
   },
   diningHallChip: {
     marginRight: spacing.sm,
@@ -979,7 +1129,6 @@ const styles = StyleSheet.create({
   },
   mealPeriodChips: {
     gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
   },
   mealPeriodChip: {
     marginRight: spacing.sm,
@@ -1021,5 +1170,67 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
+  },
+  // Loading state
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl,
+    marginTop: spacing.lg,
+  },
+  loadingText: {
+    marginTop: spacing.md,
+  },
+  // Craving button section
+  cravingButtonSection: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+    maxHeight: '60%',
+    marginBottom: 0,
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  modalCloseButton: {
+    padding: spacing.sm,
+  },
+  modalMoodChips: {
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  modalInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  modalCancelButton: {
+    flex: 1,
+  },
+  modalApplyButton: {
+    flex: 1,
   },
 });

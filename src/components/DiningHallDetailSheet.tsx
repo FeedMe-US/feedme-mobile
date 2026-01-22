@@ -17,6 +17,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors, spacing, radius } from '@/src/theme';
 import { Text } from '@/src/ui/Text';
@@ -25,6 +26,7 @@ import { DiningHall, MenuItem, MenuSection, mealService } from '@/src/services/m
 import { MenuItemDetailModal } from './MenuItemDetailModal';
 import { useDailyTracking } from '@/src/store/DailyTrackingContext';
 import { haptics } from '@/src/utils/haptics';
+import { PlateIcon } from '@/src/components/icons';
 import {
   MealPeriod,
   getAvailableMealPeriods,
@@ -59,6 +61,7 @@ export function DiningHallDetailSheet({
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'dark'];
   const { addMeal } = useDailyTracking();
+  const router = useRouter();
 
   const [selectedPeriod, setSelectedPeriod] = useState<MealPeriod | null>(null);
   const [sections, setSections] = useState<MenuSection[]>([]);
@@ -209,7 +212,7 @@ export function DiningHallDetailSheet({
     setPlate([]);
   };
 
-  // Get AI recommendation and populate plate
+  // Get AI recommendation and navigate to home with plate
   const handleGetRecommendation = async () => {
     if (!hall || !selectedPeriod) return;
 
@@ -224,27 +227,33 @@ export function DiningHallDetailSheet({
         { mode: 'specific', date: today }
       );
 
-      // Convert recommendation items to plate items
-      // Convert recommendation items to plate items
-      // Filter out items without recipe_id (fallback items won't have them)
-      const recommendedPlate: PlateItem[] = recommendation.mealItems
-        .filter((item) => item.recipe_id)
-        .map((item) => ({
-          item: {
-            recipe_id: item.recipe_id!,
-            name: item.name,
-            calories: item.calories ?? 0,
-            protein_g: item.protein ?? 0,
-            carbs_g: item.carbs ?? 0,
-            fat_g: item.fat ?? 0,
-            tags: [],
-            allergens: [],
-          },
-          quantity: 1, // Recommendation already accounts for servings in the calories
-        }));
+      // Convert recommendation to format for home screen
+      const mealRecommendation = {
+        diningHall: recommendation.diningHall,
+        mealItems: recommendation.mealItems,
+        calories: recommendation.calories,
+        protein: recommendation.protein,
+        carbs: recommendation.carbs,
+        fat: recommendation.fat,
+      };
 
-      setPlate(recommendedPlate);
+      // Navigate to home with the recommendation data
       haptics.success();
+      onClose(); // Close the sheet first
+
+      // Small delay to ensure sheet closes smoothly
+      setTimeout(() => {
+        router.push({
+          pathname: '/(tabs)',
+          params: {
+            buildPlate: 'true',
+            hallSlug: hall.slug || '',
+            hallName: hall.name || '',
+            mealPeriod: selectedPeriod || '',
+            recommendation: JSON.stringify(mealRecommendation),
+          },
+        });
+      }, 300);
     } catch (error) {
       console.error('Failed to get recommendation:', error);
       haptics.error();
@@ -399,9 +408,12 @@ export function DiningHallDetailSheet({
                     {recommendLoading ? (
                       <ActivityIndicator size="small" color={themeColors.textInverse} />
                     ) : (
-                      <Text variant="body" weight="semibold" style={{ color: themeColors.textInverse }}>
-                        ✨ Build My Plate
-                      </Text>
+                      <View style={styles.buildPlateButtonContent}>
+                        <Text variant="body" weight="semibold" style={{ color: themeColors.textInverse }}>
+                          Build My Plate
+                        </Text>
+                        <PlateIcon size={22} color={themeColors.textInverse} />
+                      </View>
                     )}
                   </TouchableOpacity>
                 )}
@@ -726,5 +738,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
+  },
+  buildPlateButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
 });

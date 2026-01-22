@@ -11,6 +11,8 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
+  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -23,6 +25,7 @@ import { foodService, FoodItem } from '@/src/services/foodService';
 import { useDailyTracking } from '@/src/store/DailyTrackingContext';
 import { haptics } from '@/src/utils/haptics';
 import { AppIcon } from '@/src/components/AppIcon';
+import { QuantityStepper } from '@/src/components/QuantityStepper';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
@@ -56,6 +59,13 @@ export default function ManualLogScreen() {
     mealTypeParam || getDefaultMealType()
   );
 
+  // Quantity modal state
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [isEditingQuantity, setIsEditingQuantity] = useState(false);
+  const [quantityInputValue, setQuantityInputValue] = useState('1');
+
   useEffect(() => {
     loadRecentFoods();
   }, []);
@@ -68,6 +78,25 @@ export default function ManualLogScreen() {
     }
   }, [searchQuery]);
 
+  // Handle keyboard show/hide to scroll search input into view
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        if (isSearchFocused) {
+          // Scroll to show search input when keyboard appears
+          setTimeout(() => {
+            scrollViewRef.current?.scrollTo({ y: 150, animated: true });
+          }, 100);
+        }
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+    };
+  }, [isSearchFocused, isEditingQuantity]);
+
   const loadRecentFoods = async () => {
     const recent = await foodService.getRecentFoods();
     setRecentFoods(recent);
@@ -78,30 +107,78 @@ export default function ManualLogScreen() {
     setSearchResults(results);
   };
 
-  const handleAddFood = (food: FoodItem) => {
+  const handleFoodSelect = (food: FoodItem) => {
+    haptics.light();
+    setSelectedFood(food);
+    setQuantity(1);
+    setQuantityInputValue('1');
+    setIsEditingQuantity(false);
+    setShowQuantityModal(true);
+  };
+
+  const handleLogFood = () => {
+    if (!selectedFood) return;
+
     haptics.success();
     addMeal({
-      name: food.name,
+      name: selectedFood.name,
       mealType: selectedMeal,
-      calories: food.calories,
-      protein: food.protein,
-      carbs: food.carbs,
-      fats: food.fat,
-      quantity: 1,
+      calories: selectedFood.calories * quantity,
+      protein: selectedFood.protein * quantity,
+      carbs: selectedFood.carbs * quantity,
+      fats: selectedFood.fat * quantity,
+      quantity: quantity,
     });
-    foodService.addToRecent(food.id);
+    foodService.addToRecent(selectedFood.id);
+    setShowQuantityModal(false);
+    setSelectedFood(null);
     router.back();
   };
 
   const scrollViewRef = useRef<ScrollView>(null);
   const searchInputRef = useRef<TextInput>(null);
+  const quantityInputRef = useRef<TextInput>(null);
+
+  // Format quantity for display (show fractions for common decimals)
+  const formatQuantityDisplay = (value: number): string => {
+    const whole = Math.floor(value);
+    const decimal = value - whole;
+
+    // Map common fractions
+    const fractionMap: Record<number, string> = {
+      0: '',
+      0.125: '⅛',
+      0.25: '¼',
+      0.375: '⅜',
+      0.5: '½',
+      0.625: '⅝',
+      0.75: '¾',
+      0.875: '⅞',
+    };
+
+    const roundedDecimal = Math.round(decimal * 8) / 8;
+    const fraction = fractionMap[roundedDecimal];
+
+    if (fraction !== undefined) {
+      if (whole === 0 && fraction) {
+        return fraction;
+      } else if (fraction) {
+        return `${whole}${fraction}`;
+      } else {
+        return `${whole}`;
+      }
+    }
+
+    // Fallback to decimal
+    return value.toFixed(2).replace(/\.?0+$/, '');
+  };
 
   return (
     <Screen>
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 20}>
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollContainer}
@@ -223,17 +300,17 @@ export default function ManualLogScreen() {
             onChangeText={setSearchQuery}
             onFocus={() => {
               setIsSearchFocused(true);
-              // Scroll to top when search is focused
-              setTimeout(() => {
-                scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-              }, 100);
             }}
             onBlur={() => {
               // Delay to allow tap events on results
               setTimeout(() => setIsSearchFocused(false), 200);
             }}
             returnKeyType="search"
-            blurOnSubmit={false}
+            blurOnSubmit={true}
+            onSubmitEditing={() => {
+              searchInputRef.current?.blur();
+              Keyboard.dismiss();
+            }}
           />
         </View>
 
@@ -248,7 +325,7 @@ export default function ManualLogScreen() {
                     variant="outlined"
                     padding="md"
                     style={styles.foodCard}
-                    onTouchEnd={() => handleAddFood(food)}>
+                    onTouchEnd={() => handleFoodSelect(food)}>
                     <View style={styles.foodCardContent}>
                       <View style={styles.foodInfo}>
                         <Text variant="body" weight="semibold">
@@ -291,7 +368,7 @@ export default function ManualLogScreen() {
                       variant="outlined"
                       padding="md"
                       style={styles.foodCard}
-                      onTouchEnd={() => handleAddFood(food)}>
+                      onTouchEnd={() => handleFoodSelect(food)}>
                       <View style={styles.foodCardContent}>
                         <View style={styles.foodInfo}>
                           <Text variant="body" weight="semibold">
@@ -323,6 +400,209 @@ export default function ManualLogScreen() {
         </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Quantity Selection Modal */}
+      <Modal
+        visible={showQuantityModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowQuantityModal(false)}>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalOverlayTouchable}
+            activeOpacity={1}
+            onPress={() => setShowQuantityModal(false)} />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={[styles.modalKeyboardAvoid, { backgroundColor: themeColors.surface }]}>
+            <View
+              style={[styles.modalContent, { backgroundColor: themeColors.surface }]}>
+              {selectedFood && (
+                <>
+                  <View style={styles.modalHeader}>
+                    <View style={styles.modalHeaderContent}>
+                      <Text variant="h3" weight="semibold" numberOfLines={2}>
+                        {selectedFood.name}
+                      </Text>
+                      <Text variant="caption" color="secondary" style={styles.modalServingSize}>
+                        {selectedFood.servingSize}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => {
+                        haptics.light();
+                        setShowQuantityModal(false);
+                      }}
+                      style={styles.modalCloseButton}>
+                      <AppIcon type="close" size={20} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={[styles.modalNutritionInfo, { backgroundColor: themeColors.background }]}>
+                    <View style={styles.nutritionRow}>
+                      <Text variant="bodySmall" color="secondary">Calories</Text>
+                      <Text variant="body" weight="semibold">
+                        {Math.round(selectedFood.calories * quantity)} cal
+                      </Text>
+                    </View>
+                    <View style={styles.nutritionRow}>
+                      <Text variant="bodySmall" color="secondary">Protein</Text>
+                      <Text variant="body" weight="semibold">
+                        {Math.round(selectedFood.protein * quantity * 10) / 10}g
+                      </Text>
+                    </View>
+                    <View style={styles.nutritionRow}>
+                      <Text variant="bodySmall" color="secondary">Carbs</Text>
+                      <Text variant="body" weight="semibold">
+                        {Math.round(selectedFood.carbs * quantity * 10) / 10}g
+                      </Text>
+                    </View>
+                    <View style={styles.nutritionRow}>
+                      <Text variant="bodySmall" color="secondary">Fat</Text>
+                      <Text variant="body" weight="semibold">
+                        {Math.round(selectedFood.fat * quantity * 10) / 10}g
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.quantitySection}>
+                    <Text variant="h4" weight="semibold" style={styles.quantityLabel}>
+                      Quantity
+                    </Text>
+                    <View style={styles.quantityControls}>
+                      <View style={styles.stepperContainer}>
+                        <TouchableOpacity
+                          style={[
+                            styles.stepperButton,
+                            {
+                              backgroundColor: themeColors.backgroundTertiary,
+                              opacity: quantity > 0.25 ? 1 : 0.4,
+                            },
+                          ]}
+                          onPress={() => {
+                            if (quantity > 0.25) {
+                              haptics.light();
+                              const newValue = Math.max(0.25, quantity - 1);
+                              setQuantity(newValue);
+                              setQuantityInputValue(newValue.toString());
+                            }
+                          }}
+                          disabled={quantity <= 0.25}>
+                          <Text
+                            style={[styles.stepperButtonText, { fontSize: 16, color: themeColors.text }]}
+                            weight="semibold">
+                            −
+                          </Text>
+                        </TouchableOpacity>
+
+                        {isEditingQuantity ? (
+                          <TextInput
+                            ref={quantityInputRef}
+                            style={[
+                              styles.quantityValueInput,
+                              {
+                                backgroundColor: themeColors.background,
+                                color: themeColors.text,
+                                borderColor: themeColors.primary,
+                              },
+                            ]}
+                            value={quantityInputValue}
+                            onChangeText={(text) => {
+                              setQuantityInputValue(text);
+                              const num = parseFloat(text);
+                              if (!isNaN(num) && num >= 0.25 && num <= 10) {
+                                setQuantity(num);
+                              }
+                            }}
+                            onFocus={() => {
+                              // Input will be visible due to KeyboardAvoidingView
+                            }}
+                            onBlur={() => {
+                              const num = parseFloat(quantityInputValue);
+                              if (isNaN(num) || num < 0.25) {
+                                setQuantity(0.25);
+                                setQuantityInputValue('0.25');
+                              } else if (num > 10) {
+                                setQuantity(10);
+                                setQuantityInputValue('10');
+                              } else {
+                                setQuantity(num);
+                                setQuantityInputValue(num.toString());
+                              }
+                              setIsEditingQuantity(false);
+                            }}
+                            keyboardType="decimal-pad"
+                            autoFocus
+                            selectTextOnFocus
+                          />
+                        ) : (
+                          <TouchableOpacity
+                            style={styles.quantityValueDisplay}
+                            onPress={() => {
+                              haptics.light();
+                              setIsEditingQuantity(true);
+                              setQuantityInputValue(quantity.toString());
+                            }}>
+                            <Text variant="body" weight="semibold" style={{ textAlign: 'center' }}>
+                              {formatQuantityDisplay(quantity)}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity
+                          style={[
+                            styles.stepperButton,
+                            {
+                              backgroundColor: themeColors.primary,
+                              opacity: quantity < 10 ? 1 : 0.4,
+                            },
+                          ]}
+                          onPress={() => {
+                            if (quantity < 10) {
+                              haptics.light();
+                              const newValue = Math.min(10, quantity + 1);
+                              setQuantity(newValue);
+                              setQuantityInputValue(newValue.toString());
+                            }
+                          }}
+                          disabled={quantity >= 10}>
+                          <Text
+                            style={[styles.stepperButtonText, { fontSize: 16, color: themeColors.textInverse }]}
+                            weight="semibold">
+                            +
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.modalActions}>
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      fullWidth
+                      onPress={() => {
+                        haptics.light();
+                        setShowQuantityModal(false);
+                      }}
+                      style={styles.modalCancelButton}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="md"
+                      fullWidth
+                      onPress={handleLogFood}
+                      style={styles.modalLogButton}>
+                      Log
+                    </Button>
+                  </View>
+                </>
+              )}
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -426,6 +706,104 @@ const styles = StyleSheet.create({
   arrowIcon: {
     fontSize: 18,
     opacity: 0.5,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalOverlayTouchable: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalKeyboardAvoid: {
+    width: '100%',
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+  },
+  modalContent: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+    width: '100%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.lg,
+  },
+  modalHeaderContent: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  modalServingSize: {
+    marginTop: spacing.xs,
+  },
+  modalCloseButton: {
+    padding: spacing.xs,
+  },
+  modalNutritionInfo: {
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  nutritionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  quantitySection: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+    gap: spacing.md,
+  },
+  quantityLabel: {
+    marginBottom: spacing.sm,
+  },
+  quantityControls: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  stepperButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperButtonText: {
+    lineHeight: 20,
+  },
+  quantityValueDisplay: {
+    minWidth: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  quantityValueInput: {
+    minWidth: 54,
+    height: 36,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 2,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  modalCancelButton: {
+    flex: 1,
+  },
+  modalLogButton: {
+    flex: 1,
   },
 });
 

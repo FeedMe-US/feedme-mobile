@@ -191,7 +191,6 @@ export default function MenuScreen() {
               </Text>
             </View>
           </View>
-          <Text style={styles.chevron}>{'>'}</Text>
         </TouchableOpacity>
       </Card>
     );
@@ -240,7 +239,6 @@ export default function MenuScreen() {
               </Text>
             </View>
           </View>
-          <Text style={styles.chevron}>{'>'}</Text>
         </TouchableOpacity>
       </Card>
     );
@@ -390,11 +388,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs,
     borderRadius: radius.sm,
-  },
-  chevron: {
-    fontSize: 20,
-    opacity: 0.4,
-    marginLeft: spacing.sm,
   },
   loadingScreen: {
     padding: spacing.xxxl,

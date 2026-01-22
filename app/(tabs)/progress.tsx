@@ -24,6 +24,7 @@ import {
   MonthlyStats,
 } from '@/src/services/analyticsService';
 import { userService } from '@/src/services/userService';
+import { LockIcon } from '@/src/components/icons';
 
 type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
 type MetricType = 'protein' | 'calories' | 'weight' | 'consistency';
@@ -38,7 +39,7 @@ export default function ProgressScreen() {
   const [weeklyData, setWeeklyData] = useState<WeeklyStats[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyStats[]>([]);
   const [dailyData, setDailyData] = useState<DailyStats[]>([]);
-  const [selectedVitamins, setSelectedVitamins] = useState<string[]>([]);
+  const [selectedVitamins, setSelectedVitamins] = useState<string[]>(['vitamin_d_mcg', 'vitamin_b12_mcg', 'iron_mg']);
   const [accountCreatedAt, setAccountCreatedAt] = useState<string | null>(null);
 
   // Load user's selected vitamins from profile/onboarding data
@@ -100,6 +101,7 @@ export default function ProgressScreen() {
   const loadAnalyticsData = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Analytics service now always returns mock data immediately
       if (period === 'weekly') {
         const data = await analyticsService.getWeeklyStats(4);
         setWeeklyData(data);
@@ -198,9 +200,9 @@ export default function ProgressScreen() {
                     {p.charAt(0).toUpperCase() + p.slice(1)}
                   </Text>
                   {isLocked && (
-                    <Text style={{ fontSize: 10, marginLeft: 4, color: themeColors.textSecondary }}>
-                      🔒
-                    </Text>
+                    <View style={{ marginLeft: 4 }}>
+                      <LockIcon size={12} color={themeColors.textSecondary} />
+                    </View>
                   )}
                 </View>
               </TouchableOpacity>
@@ -284,7 +286,8 @@ function DailyView({ tracking, macroSplit, selectedVitamins }: { tracking: any; 
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light']; // Default to light for Neumorphism
 
-  // Map backend vitamin keys to display abbreviations
+  // Map backend vitamin keys (snake_case) to display abbreviations
+  // This mapping is critical for matching backend API response keys
   const vitaminDisplayMap: Record<string, string> = {
     'vitamin_d_mcg': 'Vit D',
     'vitamin_b12_mcg': 'B12',
@@ -499,7 +502,7 @@ function MonthlyView({ metric, data, tracking }: { metric: MetricType; data: Mon
 
   const chartData = getMonthlyData();
   const chartColor = metric === 'protein' ? themeColors.protein : themeColors.primary;
-  
+
   // Get goal value based on metric
   const getGoalValue = () => {
     switch (metric) {
@@ -583,7 +586,7 @@ function YearlyView({ metric, data, tracking }: { metric: MetricType; data: Mont
 
   const chartData = getYearlyData();
   const chartColor = metric === 'protein' ? themeColors.protein : themeColors.primary;
-  
+
   // Get goal value based on metric
   const getGoalValue = () => {
     switch (metric) {
@@ -633,12 +636,12 @@ function YearlyView({ metric, data, tracking }: { metric: MetricType; data: Mont
   );
 }
 
-function LockedPeriodView({ 
-  period, 
-  accountAgeDays, 
-  themeColors 
-}: { 
-  period: 'weekly' | 'monthly' | 'yearly'; 
+function LockedPeriodView({
+  period,
+  accountAgeDays,
+  themeColors
+}: {
+  period: 'weekly' | 'monthly' | 'yearly';
   accountAgeDays: number;
   themeColors: any;
 }) {
@@ -673,9 +676,7 @@ function LockedPeriodView({
     <Card variant="elevated" padding="lg" style={styles.lockedCard}>
       <View style={styles.lockedContent}>
         <View style={[styles.lockIcon, { backgroundColor: themeColors.primary + '20' }]}>
-          <Text variant="h2" weight="bold" style={{ color: themeColors.primary }}>
-            🔒
-          </Text>
+          <LockIcon size={40} color={themeColors.primary} />
         </View>
         <Text variant="h4" weight="semibold" style={styles.lockedTitle}>
           {info.label} View Locked
@@ -683,17 +684,17 @@ function LockedPeriodView({
         <Text variant="body" color="secondary" style={styles.lockedDescription}>
           {info.description}
         </Text>
-        
+
         <View style={styles.progressContainer}>
           <View style={styles.progressBar}>
-            <View 
+            <View
               style={[
-                styles.progressFill, 
-                { 
-                  width: `${progress}%`, 
-                  backgroundColor: themeColors.primary 
+                styles.progressFill,
+                {
+                  width: `${progress}%`,
+                  backgroundColor: themeColors.primary
                 }
-              ]} 
+              ]}
             />
           </View>
           <Text variant="bodySmall" color="secondary" style={styles.progressText}>
@@ -874,4 +875,3 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 });
-
