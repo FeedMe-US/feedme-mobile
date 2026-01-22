@@ -5,9 +5,6 @@
  * Configure global mocks and extend Jest here.
  */
 
-// Silence React Native warnings in tests
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
-
 // Mock expo-router
 jest.mock('expo-router', () => ({
   useRouter: () => ({
