@@ -27,7 +27,7 @@ jobs:
             https://raw.githubusercontent.com/FeedMe-US/feedme-docs/main/api/openapi.json
 
       - name: Generate TypeScript types
-        run: npm run api:generate
+        run: npx openapi-typescript shared/openapi.json --output src/types/api.generated.ts
 
       - name: Check for changes
         id: changes
