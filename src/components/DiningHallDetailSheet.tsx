@@ -238,6 +238,7 @@ export function DiningHallDetailSheet({
             carbs_g: item.carbs ?? 0,
             fat_g: item.fat ?? 0,
             tags: [],
+            allergens: [],
           },
           quantity: 1, // Recommendation already accounts for servings in the calories
         }));

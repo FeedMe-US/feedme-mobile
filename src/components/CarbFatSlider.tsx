@@ -170,7 +170,7 @@ export function CarbFatSlider({
       transform: [
         { translateX: withSpring(position - 12, { damping: 15, stiffness: 150 }) },
         { scale: isDragging.value ? 1.2 : 1 },
-      ],
+      ] as const,
     };
   });
 
