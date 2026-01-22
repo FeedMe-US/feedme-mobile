@@ -11,6 +11,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.DOCS_READ_TOKEN }}
 
       - name: Checkout feedme-docs
         uses: actions/checkout@v4
@@ -23,6 +25,7 @@ jobs:
         run: |
           mkdir -p shared
           cp docs-repo/api/openapi.json shared/openapi.json
+          rm -rf docs-repo
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -43,14 +46,23 @@ jobs:
 
       - name: Create PR if changed
         if: steps.changes.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.DOCS_READ_TOKEN }}
-          commit-message: 'chore: sync API types from feedme-docs'
-          title: 'chore: sync API types'
-          body: |
-            Automated PR to sync TypeScript types from feedme-docs.
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_READ_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-            Triggered by: ${{ github.event_name }}
-          branch: chore/sync-api-types
-          delete-branch: true
+          # Create and push branch
+          git checkout -b chore/sync-api-types
+          git add shared/openapi.json src/types/api.generated.ts
+          git commit -m "chore: sync API types from feedme-docs"
+          git push -f origin chore/sync-api-types
+
+          # Create PR using gh cli
+          gh pr create \
+            --title "chore: sync API types" \
+            --body "Automated PR to sync TypeScript types from feedme-docs.
+
+          Triggered by: ${{ github.event_name }}" \
+            --base main \
+            --head chore/sync-api-types || echo "PR already exists or creation failed"
