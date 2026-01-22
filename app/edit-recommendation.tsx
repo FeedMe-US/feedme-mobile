@@ -318,7 +318,7 @@ export default function EditRecommendationScreen() {
                 variant="body"
                 color="secondary"
                 style={{ marginTop: spacing.md, textAlign: 'center' }}>
-                No items in your meal.{'\n'}Tap "Add Item" to get started.
+                No items in your meal.{'\n'}Tap &quot;Add Item&quot; to get started.
               </Text>
             </View>
           )}
