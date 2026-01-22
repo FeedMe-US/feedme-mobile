@@ -12,6 +12,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout feedme-docs
+        uses: actions/checkout@v4
+        with:
+          repository: FeedMe-US/feedme-docs
+          token: ${{ secrets.DOCS_READ_TOKEN }}
+          path: docs-repo
+
+      - name: Copy OpenAPI spec
+        run: |
+          mkdir -p shared
+          cp docs-repo/api/openapi.json shared/openapi.json
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -20,11 +32,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Fetch latest OpenAPI spec
-        run: |
-          curl -o shared/openapi.json \
-            https://raw.githubusercontent.com/FeedMe-US/feedme-docs/main/api/openapi.json
 
       - name: Generate TypeScript types
         run: npx openapi-typescript shared/openapi.json --output src/types/api.generated.ts
