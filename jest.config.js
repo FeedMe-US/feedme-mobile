@@ -22,7 +22,12 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/$1',
     // Map expo winter modules to empty mocks
     '^expo/src/winter/(.*)$': '<rootDir>/__mocks__/emptyModule.js',
+    // Handle expo runtime module
+    '^expo/src/(.*)$': '<rootDir>/__mocks__/emptyModule.js',
   },
+
+  // Use node test environment to avoid expo-specific issues
+  testEnvironment: 'node',
 
   // Test file patterns
   testMatch: [

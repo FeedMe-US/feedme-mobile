@@ -1,10 +1,17 @@
 /**
  * API Client Configuration
  * Base configuration for connecting to the FeedMe backend API
+ *
+ * Includes automatic token refresh on 401 AUTH_TOKEN_EXPIRED errors.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NetworkError, ApiError, AuthError, RateLimitError, ServerError } from '@/src/types/errors';
+import {
+  isTokenExpiredError,
+  refreshAuthToken,
+  handleAuthFailure,
+} from './tokenRefresh';
 
 // API Configuration
 // Uses EXPO_PUBLIC_API_URL environment variable if set, otherwise falls back to defaults
@@ -171,176 +178,246 @@ class ApiClient {
     return { message: 'Request failed' };
   }
 
-  async get<T>(endpoint: string): Promise<ApiResponse<T>> {
-    try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        method: 'GET',
-        headers: this.getHeaders(),
-      });
+  /**
+   * Execute a fetch request with automatic token refresh and retry.
+   * If the request fails with AUTH_TOKEN_EXPIRED, attempts to refresh
+   * the token and retry once.
+   *
+   * @param fetchFn - Function that performs the fetch request
+   * @param endpoint - Endpoint name for logging
+   * @returns API response (success or error)
+   */
+  private async executeWithRetry<T>(
+    fetchFn: () => Promise<ApiResponse<T>>,
+    endpoint: string,
+  ): Promise<ApiResponse<T>> {
+    // First attempt
+    const result = await fetchFn();
 
-      if (response.status === 204) {
-        return { status: 204 };
-      }
+    // Check if this is a token expired error
+    if (isTokenExpiredError(result.status, result.errorCode)) {
+      console.log(`[API] Token expired for ${endpoint}, attempting refresh...`);
 
-      // Try to parse as JSON, but handle text responses gracefully
-      const contentType = response.headers.get('content-type');
-      let data: any;
+      // Try to refresh the token
+      const newToken = await refreshAuthToken();
 
-      if (contentType && contentType.includes('application/json')) {
-        data = await response.json();
+      if (newToken) {
+        // Retry the request with the new token
+        console.log(`[API] Retrying ${endpoint} with refreshed token`);
+        const retryResult = await fetchFn();
+
+        // If retry also fails with token expired, sign out (prevents infinite loops)
+        if (isTokenExpiredError(retryResult.status, retryResult.errorCode)) {
+          console.log(`[API] Retry also failed with expired token for ${endpoint}, signing out`);
+          try {
+            await handleAuthFailure();
+          } catch (err) {
+            console.error(`[API] Failed to handle auth failure:`, err);
+          }
+        }
+
+        return retryResult;
       } else {
-        // Non-JSON response - read as text for debugging
-        const text = await response.text();
-        console.warn(`[API] Non-JSON response from ${endpoint}:`, text.substring(0, 200));
-        if (!response.ok) {
-          return {
-            error: text || 'Request failed',
-            status: response.status,
-          };
-        }
-        // If response.ok but not JSON, try parsing anyway
+        // Refresh failed - sign out the user
+        console.log(`[API] Token refresh failed for ${endpoint}, signing out`);
         try {
-          data = JSON.parse(text);
-        } catch {
+          await handleAuthFailure();
+        } catch (err) {
+          console.error(`[API] Failed to handle auth failure:`, err);
+        }
+        return result; // Return original error
+      }
+    }
+
+    return result;
+  }
+
+  async get<T>(endpoint: string): Promise<ApiResponse<T>> {
+    const fetchFn = async (): Promise<ApiResponse<T>> => {
+      try {
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+          method: 'GET',
+          headers: this.getHeaders(),
+        });
+
+        if (response.status === 204) {
+          return { status: 204 };
+        }
+
+        // Try to parse as JSON, but handle text responses gracefully
+        const contentType = response.headers.get('content-type');
+        let data: any;
+
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          // Non-JSON response - read as text for debugging
+          const text = await response.text();
+          console.warn(`[API] Non-JSON response from ${endpoint}:`, text.substring(0, 200));
+          if (!response.ok) {
+            return {
+              error: text || 'Request failed',
+              status: response.status,
+            };
+          }
+          // If response.ok but not JSON, try parsing anyway
+          try {
+            data = JSON.parse(text);
+          } catch {
+            return {
+              error: `Unexpected response format: ${text.substring(0, 100)}`,
+              status: response.status,
+            };
+          }
+        }
+
+        if (!response.ok) {
+          const errorInfo = this.extractError(data);
           return {
-            error: `Unexpected response format: ${text.substring(0, 100)}`,
+            error: errorInfo.message,
+            errorCode: errorInfo.code,
             status: response.status,
           };
         }
-      }
 
-      if (!response.ok) {
-        const errorInfo = this.extractError(data);
+        return { data, status: response.status };
+      } catch (error) {
+        console.error(`[API] Fetch error for ${endpoint}:`, error);
         return {
-          error: errorInfo.message,
-          errorCode: errorInfo.code,
-          status: response.status,
+          error: error instanceof Error ? error.message : 'Network error',
+          status: 0,
         };
       }
+    };
 
-      return { data, status: response.status };
-    } catch (error) {
-      console.error(`[API] Fetch error for ${endpoint}:`, error);
-      return {
-        error: error instanceof Error ? error.message : 'Network error',
-        status: 0,
-      };
-    }
+    return this.executeWithRetry(fetchFn, endpoint);
   }
 
   async post<T>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
-    try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: body ? JSON.stringify(body) : undefined,
-      });
+    const fetchFn = async (): Promise<ApiResponse<T>> => {
+      try {
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: body ? JSON.stringify(body) : undefined,
+        });
 
-      if (response.status === 204) {
-        return { status: 204 };
-      }
+        if (response.status === 204) {
+          return { status: 204 };
+        }
 
-      // Try to parse as JSON, but handle text responses gracefully
-      const contentType = response.headers.get('content-type');
-      let data: any;
+        // Try to parse as JSON, but handle text responses gracefully
+        const contentType = response.headers.get('content-type');
+        let data: any;
 
-      if (contentType && contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        console.warn(`[API] Non-JSON response from ${endpoint}:`, text.substring(0, 200));
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          const text = await response.text();
+          console.warn(`[API] Non-JSON response from ${endpoint}:`, text.substring(0, 200));
+          if (!response.ok) {
+            return {
+              error: text || 'Request failed',
+              status: response.status,
+            };
+          }
+          try {
+            data = JSON.parse(text);
+          } catch {
+            return {
+              error: `Unexpected response format: ${text.substring(0, 100)}`,
+              status: response.status,
+            };
+          }
+        }
+
         if (!response.ok) {
+          const errorInfo = this.extractError(data);
           return {
-            error: text || 'Request failed',
+            error: errorInfo.message,
+            errorCode: errorInfo.code,
             status: response.status,
           };
         }
-        try {
-          data = JSON.parse(text);
-        } catch {
-          return {
-            error: `Unexpected response format: ${text.substring(0, 100)}`,
-            status: response.status,
-          };
-        }
-      }
 
-      if (!response.ok) {
-        const errorInfo = this.extractError(data);
+        return { data, status: response.status };
+      } catch (error) {
+        console.error(`[API] Fetch error for ${endpoint}:`, error);
         return {
-          error: errorInfo.message,
-          errorCode: errorInfo.code,
-          status: response.status,
+          error: error instanceof Error ? error.message : 'Network error',
+          status: 0,
         };
       }
+    };
 
-      return { data, status: response.status };
-    } catch (error) {
-      console.error(`[API] Fetch error for ${endpoint}:`, error);
-      return {
-        error: error instanceof Error ? error.message : 'Network error',
-        status: 0,
-      };
-    }
+    return this.executeWithRetry(fetchFn, endpoint);
   }
 
   async put<T>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
-    try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        method: 'PUT',
-        headers: this.getHeaders(),
-        body: body ? JSON.stringify(body) : undefined,
-      });
+    const fetchFn = async (): Promise<ApiResponse<T>> => {
+      try {
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+          method: 'PUT',
+          headers: this.getHeaders(),
+          body: body ? JSON.stringify(body) : undefined,
+        });
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (!response.ok) {
-        const errorInfo = this.extractError(data);
+        if (!response.ok) {
+          const errorInfo = this.extractError(data);
+          return {
+            error: errorInfo.message,
+            errorCode: errorInfo.code,
+            status: response.status,
+          };
+        }
+
+        return { data, status: response.status };
+      } catch (error) {
         return {
-          error: errorInfo.message,
-          errorCode: errorInfo.code,
-          status: response.status,
+          error: error instanceof Error ? error.message : 'Network error',
+          status: 0,
         };
       }
+    };
 
-      return { data, status: response.status };
-    } catch (error) {
-      return {
-        error: error instanceof Error ? error.message : 'Network error',
-        status: 0,
-      };
-    }
+    return this.executeWithRetry(fetchFn, endpoint);
   }
 
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
-    try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        method: 'DELETE',
-        headers: this.getHeaders(),
-      });
+    const fetchFn = async (): Promise<ApiResponse<T>> => {
+      try {
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+          method: 'DELETE',
+          headers: this.getHeaders(),
+        });
 
-      if (response.status === 204) {
-        return { status: 204 };
-      }
+        if (response.status === 204) {
+          return { status: 204 };
+        }
 
-      const data = await response.json();
+        const data = await response.json();
 
-      if (!response.ok) {
-        const errorInfo = this.extractError(data);
+        if (!response.ok) {
+          const errorInfo = this.extractError(data);
+          return {
+            error: errorInfo.message,
+            errorCode: errorInfo.code,
+            status: response.status,
+          };
+        }
+
+        return { data, status: response.status };
+      } catch (error) {
         return {
-          error: errorInfo.message,
-          errorCode: errorInfo.code,
-          status: response.status,
+          error: error instanceof Error ? error.message : 'Network error',
+          status: 0,
         };
       }
+    };
 
-      return { data, status: response.status };
-    } catch (error) {
-      return {
-        error: error instanceof Error ? error.message : 'Network error',
-        status: 0,
-      };
-    }
+    return this.executeWithRetry(fetchFn, endpoint);
   }
 }
 
