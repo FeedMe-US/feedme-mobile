@@ -154,6 +154,8 @@ export interface MealRecommendation {
   carbs: number;
   fat: number;
   mealType?: MealType;
+  /** When true, indicates the dining hall is closed and no menu is available */
+  isClosed?: boolean;
 }
 
 // API response types for /recommend endpoint
@@ -211,45 +213,6 @@ const FALLBACK_DINING_HALLS: DiningHall[] = [
   { id: 41, name: 'Epicuria at Ackerman', slug: 'epicuria-at-ackerman', type: 'boutique', is_residential: false, campus_area: 'Central', is_open_now: false, latitude: 34.0705, longitude: -118.4430 },
 ];
 
-// Fallback meal recommendations for offline/error scenarios
-const FALLBACK_MEALS: Record<string, MealRecommendation> = {
-  'bruin-plate': {
-    diningHall: 'Bruin Plate',
-    mealItems: [
-      { name: 'Grilled Salmon', amount: '6 oz' },
-      { name: 'Quinoa Pilaf', amount: '1 cup' },
-      { name: 'Roasted Vegetables', amount: '1 cup' },
-    ],
-    calories: 650,
-    protein: 45,
-    carbs: 55,
-    fat: 22,
-  },
-  'de-neve-dining': {
-    diningHall: 'De Neve Dining',
-    mealItems: [
-      { name: 'Chicken Parmesan', amount: '8 oz' },
-      { name: 'Pasta Marinara', amount: '1.5 cups' },
-      { name: 'Caesar Salad', amount: '1 cup' },
-    ],
-    calories: 780,
-    protein: 42,
-    carbs: 72,
-    fat: 28,
-  },
-  'epicuria-at-covel': {
-    diningHall: 'Epicuria at Covel',
-    mealItems: [
-      { name: 'Mediterranean Bowl', amount: '1 bowl' },
-      { name: 'Hummus & Pita', amount: '1 serving' },
-    ],
-    calories: 620,
-    protein: 28,
-    carbs: 68,
-    fat: 24,
-  },
-};
-
 // Service status tracking
 interface ServiceStatus {
   isAvailable: boolean;
@@ -289,7 +252,7 @@ class MealService {
     console.log('[MealService] Response:', response.status, response.error ? `error: ${response.error}` : 'ok');
 
     if (response.error) {
-      console.error('[MealService] API error, using fallback');
+      console.error('[MealService] API error, returning closed response');
       serviceStatus.lastError = response.error;
       serviceStatus.isAvailable = false;
       // Return cached or fallback data
@@ -458,16 +421,16 @@ class MealService {
 
     // Check if user is authenticated - /recommend requires auth
     if (!apiClient.hasAuthToken()) {
-      console.log('[MealService] No auth token available, using fallback');
-      return this.getFallbackMeal(diningHallSlug);
+      console.log('[MealService] No auth token available, returning closed response');
+      return this.getClosedResponse(diningHallSlug);
     }
 
     // Look up the dining hall to get ID and name
     const hall = await this.getDiningHallBySlug(diningHallSlug);
 
     if (!hall) {
-      console.log('[MealService] Hall not found for slug:', diningHallSlug, '- using fallback');
-      return this.getFallbackMeal(diningHallSlug);
+      console.log('[MealService] Hall not found for slug:', diningHallSlug, '- returning closed response');
+      return this.getClosedResponse(diningHallSlug);
     }
 
     console.log('[MealService] Found hall:', hall.name, 'ID:', hall.id);
@@ -485,14 +448,14 @@ class MealService {
 
     // Handle 204 No Content (no plate found) - this is a valid response, not an error
     if (response.status === 204) {
-      console.log('[MealService] No plate available for this meal period (204), using fallback');
-      return this.getFallbackMeal(diningHallSlug, hall.name);
+      console.log('[MealService] No plate available for this meal period (204), returning closed response');
+      return this.getClosedResponse(diningHallSlug, hall.name);
     }
 
     // Handle actual errors
     if (response.error || !response.data) {
       console.error('[MealService] Recommendation API error:', response.error, 'code:', (response as any).errorCode);
-      return this.getFallbackMeal(diningHallSlug, hall.name);
+      return this.getClosedResponse(diningHallSlug, hall.name);
     }
 
     const plate = response.data.plate;
@@ -560,8 +523,8 @@ class MealService {
 
     // Check if user is authenticated - /recommend requires auth
     if (!apiClient.hasAuthToken()) {
-      console.log('[MealService] No auth token available, using fallback');
-      return this.getFallbackMeal(hallSlug || 'default');
+      console.log('[MealService] No auth token available, returning closed response');
+      return this.getClosedResponse(hallSlug || 'default');
     }
 
     // For "specific" mode, get the hall ID
@@ -617,14 +580,14 @@ class MealService {
 
     // Handle 204 No Content (no plate found)
     if (response.status === 204) {
-      console.log('[MealService] No plate available (204), using fallback');
-      return this.getFallbackMeal(hallSlug || 'default', hallName);
+      console.log('[MealService] No plate available (204), returning closed response');
+      return this.getClosedResponse(hallSlug || 'default', hallName);
     }
 
     // Handle actual errors
     if (response.error || !response.data) {
       console.error('[MealService] Recommendation API error:', response.error);
-      return this.getFallbackMeal(hallSlug || 'default', hallName);
+      return this.getClosedResponse(hallSlug || 'default', hallName);
     }
 
     const plate = response.data.plate;
@@ -660,34 +623,18 @@ class MealService {
   }
 
   /**
-   * Get fallback meal data when API is unavailable
+   * Get closed response when dining hall has no menu available
    */
-  private getFallbackMeal(slug: string, hallName?: string): MealRecommendation {
-    // Check for exact match first
-    if (FALLBACK_MEALS[slug]) {
-      return { ...FALLBACK_MEALS[slug] };
-    }
-
-    // Try partial match (e.g., 'de-neve' matches 'de-neve-dining')
-    const partialMatch = Object.keys(FALLBACK_MEALS).find(key =>
-      key.includes(slug) || slug.includes(key)
-    );
-    if (partialMatch) {
-      return { ...FALLBACK_MEALS[partialMatch] };
-    }
-
-    // Return generic fallback
+  private getClosedResponse(slug: string, hallName?: string): MealRecommendation {
+    // Return a closed indicator instead of fake meal data
     return {
       diningHall: hallName || 'Dining Hall',
-      mealItems: [
-        { name: 'Grilled Chicken', amount: '6 oz' },
-        { name: 'Steamed Rice', amount: '1 cup' },
-        { name: 'Mixed Vegetables', amount: '1 cup' },
-      ],
-      calories: 550,
-      protein: 38,
-      carbs: 48,
-      fat: 16,
+      mealItems: [],
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      isClosed: true,
     };
   }
 

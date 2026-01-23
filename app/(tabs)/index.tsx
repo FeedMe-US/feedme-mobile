@@ -789,8 +789,18 @@ useFocusEffect(
           </View>
         ) : null}
 
-        {/* Recommended Meal Card */}
-        {recommendedMeal && (
+        {/* Recommended Meal Card or Closed Message */}
+        {recommendedMeal && recommendedMeal.isClosed && (
+          <Card variant="elevated" padding="lg" style={styles.closedCard}>
+            <Text variant="h4" weight="semibold" style={styles.closedTitle}>
+              {recommendedMeal.diningHall} is closed
+            </Text>
+            <Text variant="body" color="secondary">
+              Check back during regular dining hours for meal recommendations
+            </Text>
+          </Card>
+        )}
+        {recommendedMeal && !recommendedMeal.isClosed && (
           <MealCard
             diningHall={recommendedMeal.diningHall}
             mealItems={recommendedMeal.mealItems}
@@ -840,8 +850,8 @@ useFocusEffect(
           />
         )}
 
-        {/* Craving Button - below meal card */}
-        {recommendedMeal && (
+        {/* Craving Button - below meal card (only when not closed) */}
+        {recommendedMeal && !recommendedMeal.isClosed && (
           <View style={styles.cravingButtonSection}>
             <Button
               variant="secondary"
