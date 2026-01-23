@@ -693,12 +693,16 @@ class MealService {
   /**
    * Check if a menu item is a BYO item based on is_byo_item flag or name pattern
    * @param item - The menu item to check
-   * @returns true if the item is a BYO item
+   * @returns true if the item is a BYO item with components available
    */
   isBYOItem(item: MenuItem): boolean {
-    // Check explicit flag first
-    if (item.is_byo_item) return true;
+    // If API explicitly set is_byo_item, use that value (true = has components, false = no components)
+    if (item.is_byo_item !== undefined) {
+      return item.is_byo_item;
+    }
 
+    // Fallback to name pattern matching only if is_byo_item wasn't set by API
+    // This handles legacy data or items that haven't been processed yet
     const name = item.name.toLowerCase();
 
     // Common BYO patterns in dining hall menus
