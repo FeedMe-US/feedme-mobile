@@ -15,8 +15,8 @@ web-build/
 *.mobileprovision
 *.orig.*
 
-# Environment
-.env
+# Environment (keeping .env tracked since repo is private and anon key is safe)
+# .env - intentionally tracked for this private repo
 .env.local
 .env.*.local
 
