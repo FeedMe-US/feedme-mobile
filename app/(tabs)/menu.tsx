@@ -15,6 +15,7 @@ import { DiningHallDetailSheet } from '@/src/components/DiningHallDetailSheet';
 import { LuValleDetailSheet } from '@/src/components/LuValleDetailSheet';
 import { mealService, DiningHall } from '@/src/services/mealService';
 import { haptics } from '@/src/utils/haptics';
+import { getLocationStatus, getGroupLocationStatus, isOpeningSoon, isAnyOpeningSoon } from '@/src/utils/mealPeriodUtils';
 
 // LuValle Commons location IDs (grouped together)
 const LUVALLE_IDS = [102, 103, 104, 105, 106, 107];
@@ -120,23 +121,33 @@ export default function MenuScreen() {
     setLuvalleSheetVisible(false);
   };
 
-  // Sort halls: open first, then closed
+  // Sort halls: open first, then opening soon, then closed
   const sortedHalls = useMemo(() => {
     return [...diningHalls].sort((a, b) => {
-      if (a.is_open_now && !b.is_open_now) return -1;
-      if (!a.is_open_now && b.is_open_now) return 1;
+      const aOpen = a.is_open_now;
+      const bOpen = b.is_open_now;
+      const aOpeningSoon = !aOpen && isOpeningSoon(a);
+      const bOpeningSoon = !bOpen && isOpeningSoon(b);
+
+      // Open first
+      if (aOpen && !bOpen) return -1;
+      if (!aOpen && bOpen) return 1;
+      // Then opening soon
+      if (aOpeningSoon && !bOpeningSoon) return -1;
+      if (!aOpeningSoon && bOpeningSoon) return 1;
       return 0;
     });
   }, [diningHalls]);
 
-  // Separate dining halls into categories (open and closed)
+  // Separate dining halls into categories (open/opening soon and closed)
+  // "Opening Soon" halls (within 30 min) appear with open halls for better UX
   // Hill locations: BPlate, Epicuria, De Neve, Feast, Drey, Bruin Cafe, Rendezvous, The Study, Cafe 1919
   const openHillLocations = useMemo(
-    () => sortedHalls.filter(h => isHillLocation(h) && !isLuvalleLocation(h) && h.is_open_now),
+    () => sortedHalls.filter(h => isHillLocation(h) && !isLuvalleLocation(h) && (h.is_open_now || isOpeningSoon(h))),
     [sortedHalls]
   );
   const closedHillLocations = useMemo(
-    () => sortedHalls.filter(h => isHillLocation(h) && !isLuvalleLocation(h) && !h.is_open_now),
+    () => sortedHalls.filter(h => isHillLocation(h) && !isLuvalleLocation(h) && !h.is_open_now && !isOpeningSoon(h)),
     [sortedHalls]
   );
   // LuValle locations (kept separate for grouping)
@@ -146,20 +157,21 @@ export default function MenuScreen() {
   );
   // Campus restaurants: everything NOT on the hill and NOT LuValle
   const openCampusLocations = useMemo(
-    () => sortedHalls.filter(h => !isHillLocation(h) && !isLuvalleLocation(h) && h.is_open_now),
+    () => sortedHalls.filter(h => !isHillLocation(h) && !isLuvalleLocation(h) && (h.is_open_now || isOpeningSoon(h))),
     [sortedHalls]
   );
   const closedCampusLocations = useMemo(
-    () => sortedHalls.filter(h => !isHillLocation(h) && !isLuvalleLocation(h) && !h.is_open_now),
+    () => sortedHalls.filter(h => !isHillLocation(h) && !isLuvalleLocation(h) && !h.is_open_now && !isOpeningSoon(h)),
     [sortedHalls]
   );
-  // Check if LuValle is open
+  // Check if LuValle is open or opening soon
   const isLuvalleOpen = useMemo(
-    () => luvalleLocations.some(l => l.is_open_now),
+    () => luvalleLocations.some(l => l.is_open_now) || isAnyOpeningSoon(luvalleLocations),
     [luvalleLocations]
   );
 
   const renderLocationCard = (location: DiningHall) => {
+    const statusInfo = getLocationStatus(location);
     return (
       <Card key={location.id} variant="elevated" padding="none" style={styles.locationCard}>
         <TouchableOpacity
@@ -174,20 +186,14 @@ export default function MenuScreen() {
             <View
               style={[
                 styles.statusBadge,
-                {
-                  backgroundColor: location.is_open_now
-                    ? themeColors.success + '30'
-                    : themeColors.error + '30',
-                },
+                { backgroundColor: themeColors[statusInfo.colorKey] + '30' },
               ]}
             >
               <Text
                 variant="caption"
-                style={{
-                  color: location.is_open_now ? themeColors.success : themeColors.error,
-                }}
+                style={{ color: themeColors[statusInfo.colorKey] }}
               >
-                {location.is_open_now ? 'Open' : 'Closed'}
+                {statusInfo.label}
               </Text>
             </View>
           </View>
@@ -200,8 +206,7 @@ export default function MenuScreen() {
   const renderLuvalleCard = () => {
     if (luvalleLocations.length === 0) return null;
 
-    // Check if any LuValle location is open
-    const anyLuvalleOpen = luvalleLocations.some(l => l.is_open_now);
+    const statusInfo = getGroupLocationStatus(luvalleLocations);
 
     return (
       <Card key="luvalle-grouped" variant="elevated" padding="none" style={styles.locationCard}>
@@ -222,20 +227,14 @@ export default function MenuScreen() {
             <View
               style={[
                 styles.statusBadge,
-                {
-                  backgroundColor: anyLuvalleOpen
-                    ? themeColors.success + '30'
-                    : themeColors.error + '30',
-                },
+                { backgroundColor: themeColors[statusInfo.colorKey] + '30' },
               ]}
             >
               <Text
                 variant="caption"
-                style={{
-                  color: anyLuvalleOpen ? themeColors.success : themeColors.error,
-                }}
+                style={{ color: themeColors[statusInfo.colorKey] }}
               >
-                {anyLuvalleOpen ? 'Open' : 'Closed'}
+                {statusInfo.label}
               </Text>
             </View>
           </View>

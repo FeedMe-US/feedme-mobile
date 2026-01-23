@@ -33,6 +33,7 @@ import {
   getCurrentOrNextMealPeriod,
   isAllDayLocation,
   formatMealPeriod,
+  getLocationStatus,
 } from '@/src/utils/mealPeriodUtils';
 import { getPacificDateString } from '@/src/utils/dateUtils';
 
@@ -363,27 +364,24 @@ export function DiningHallDetailSheet({
                       <Text variant="h3" weight="bold" numberOfLines={1} style={styles.hallName}>
                         {hall.name}
                       </Text>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          {
-                            backgroundColor: hall.is_open_now
-                              ? themeColors.success + '30'
-                              : themeColors.error + '30',
-                          },
-                        ]}
-                      >
-                        <Text
-                          variant="caption"
-                          style={{
-                            color: hall.is_open_now
-                              ? themeColors.success
-                              : themeColors.error,
-                          }}
-                        >
-                          {hall.is_open_now ? 'Open' : 'Closed'}
-                        </Text>
-                      </View>
+                      {(() => {
+                        const statusInfo = getLocationStatus(hall);
+                        return (
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              { backgroundColor: themeColors[statusInfo.colorKey] + '30' },
+                            ]}
+                          >
+                            <Text
+                              variant="caption"
+                              style={{ color: themeColors[statusInfo.colorKey] }}
+                            >
+                              {statusInfo.label}
+                            </Text>
+                          </View>
+                        );
+                      })()}
                     </View>
                     <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                       <Text variant="h4" color="secondary">

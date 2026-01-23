@@ -31,6 +31,7 @@ import { MenuItemDetailModal } from './MenuItemDetailModal';
 import { useDailyTracking } from '@/src/store/DailyTrackingContext';
 import { haptics } from '@/src/utils/haptics';
 import { getPacificDateString } from '@/src/utils/dateUtils';
+import { getGroupLocationStatus } from '@/src/utils/mealPeriodUtils';
 import { PlateItem } from './DiningHallDetailSheet';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -342,27 +343,24 @@ export function LuValleDetailSheet({
                       <Text variant="h3" weight="bold" numberOfLines={1} style={styles.hallName}>
                         LuValle Commons
                       </Text>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          {
-                            backgroundColor: anyOpen
-                              ? themeColors.success + '30'
-                              : themeColors.error + '30',
-                          },
-                        ]}
-                      >
-                        <Text
-                          variant="caption"
-                          style={{
-                            color: anyOpen
-                              ? themeColors.success
-                              : themeColors.error,
-                          }}
-                        >
-                          {anyOpen ? 'Open' : 'Closed'}
-                        </Text>
-                      </View>
+                      {(() => {
+                        const statusInfo = getGroupLocationStatus(locations);
+                        return (
+                          <View
+                            style={[
+                              styles.statusBadge,
+                              { backgroundColor: themeColors[statusInfo.colorKey] + '30' },
+                            ]}
+                          >
+                            <Text
+                              variant="caption"
+                              style={{ color: themeColors[statusInfo.colorKey] }}
+                            >
+                              {statusInfo.label}
+                            </Text>
+                          </View>
+                        );
+                      })()}
                     </View>
                     <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                       <Text variant="h4" color="secondary">

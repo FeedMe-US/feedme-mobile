@@ -4,6 +4,103 @@
  */
 
 import { DiningHall } from '../services/mealService';
+import { getPacificTimeString } from './dateUtils';
+
+/**
+ * Location status for display purposes
+ */
+export type LocationStatus = 'open' | 'opening_soon' | 'closed';
+
+export interface LocationStatusInfo {
+  status: LocationStatus;
+  label: string;
+  colorKey: 'success' | 'warning' | 'error';
+}
+
+/**
+ * Parse a time string (HH:mm) into minutes since midnight
+ */
+function parseTimeToMinutes(timeStr: string): number {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+/**
+ * Check if a location is opening within a specified number of minutes.
+ * Uses the next_meal_time field from the API.
+ *
+ * @param hall - The dining hall to check
+ * @param withinMinutes - How many minutes ahead to check (default: 30)
+ * @returns true if the hall is closed but opens within the specified time
+ */
+export function isOpeningSoon(hall: DiningHall, withinMinutes: number = 30): boolean {
+  // Already open? Not "opening soon"
+  if (hall.is_open_now) return false;
+
+  // No next_meal_time means we can't determine opening soon
+  if (!hall.next_meal_time) return false;
+
+  const currentTimeStr = getPacificTimeString();
+  const currentMinutes = parseTimeToMinutes(currentTimeStr);
+  const nextMealMinutes = parseTimeToMinutes(hall.next_meal_time);
+
+  // Calculate difference (handling midnight wrap-around)
+  let minutesUntilOpen = nextMealMinutes - currentMinutes;
+
+  // If next meal is earlier than current time, it's tomorrow (not opening soon today)
+  if (minutesUntilOpen < 0) return false;
+
+  return minutesUntilOpen <= withinMinutes;
+}
+
+/**
+ * Get the display status for a location including label and color.
+ *
+ * @param hall - The dining hall to check
+ * @returns Status info with label and color key
+ */
+export function getLocationStatus(hall: DiningHall): LocationStatusInfo {
+  if (hall.is_open_now) {
+    return { status: 'open', label: 'Open', colorKey: 'success' };
+  }
+
+  if (isOpeningSoon(hall)) {
+    return { status: 'opening_soon', label: 'Opening Soon', colorKey: 'warning' };
+  }
+
+  return { status: 'closed', label: 'Closed', colorKey: 'error' };
+}
+
+/**
+ * Check if any location in a group is opening soon.
+ * Useful for grouped locations like LuValle Commons.
+ *
+ * @param locations - Array of dining halls
+ * @returns true if any location is opening soon (and none are open)
+ */
+export function isAnyOpeningSoon(locations: DiningHall[]): boolean {
+  // If any is open, group is not "opening soon"
+  if (locations.some(l => l.is_open_now)) return false;
+  return locations.some(l => isOpeningSoon(l));
+}
+
+/**
+ * Get the display status for a group of locations (like LuValle Commons).
+ *
+ * @param locations - Array of dining halls
+ * @returns Status info for the group
+ */
+export function getGroupLocationStatus(locations: DiningHall[]): LocationStatusInfo {
+  if (locations.some(l => l.is_open_now)) {
+    return { status: 'open', label: 'Open', colorKey: 'success' };
+  }
+
+  if (isAnyOpeningSoon(locations)) {
+    return { status: 'opening_soon', label: 'Opening Soon', colorKey: 'warning' };
+  }
+
+  return { status: 'closed', label: 'Closed', colorKey: 'error' };
+}
 
 export type MealPeriod = 'breakfast' | 'lunch' | 'dinner' | 'late_night';
 

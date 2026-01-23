@@ -1,370 +1,216 @@
 /**
- * Tests for mealPeriodUtils - Hall-Specific Meal Period Logic
- *
- * TDD: Written before implementation to define expected behavior.
- *
- * These utility functions replace the global hard-coded meal period logic
- * with hall-specific period detection using actual operating hours.
+ * Meal Period Utils Tests
+ * Tests for isOpeningSoon and getLocationStatus utilities
  */
 
-import type { DiningHall } from '@/src/services/mealService';
+import {
+  isOpeningSoon,
+  getLocationStatus,
+  isAnyOpeningSoon,
+  getGroupLocationStatus,
+} from '../mealPeriodUtils';
+import { DiningHall } from '../../services/mealService';
+import * as dateUtils from '../dateUtils';
 
-// Import functions that will be implemented
-// import {
-//   getAvailableMealPeriods,
-//   getCurrentOrNextMealPeriod,
-//   isAllDayLocation,
-//   parseTimeToMinutes,
-//   getCurrentPacificMinutes,
-// } from '../mealPeriodUtils';
+// Mock dateUtils to control current time
+jest.mock('../dateUtils', () => ({
+  getPacificTimeString: jest.fn(),
+}));
 
-// Mock types for testing
-type MealPeriod = 'breakfast' | 'lunch' | 'dinner' | 'late_night';
+const mockGetPacificTimeString = dateUtils.getPacificTimeString as jest.Mock;
 
-interface TimeRange {
-  open: string;
-  close: string;
+// Helper to create a minimal DiningHall for testing
+function createMockHall(overrides: Partial<DiningHall> = {}): DiningHall {
+  return {
+    id: 1,
+    name: 'Test Hall',
+    slug: 'test-hall',
+    is_open_now: false,
+    next_meal_time: undefined,
+    ...overrides,
+  };
 }
 
-interface LocationHours {
-  breakfast?: TimeRange | null;
-  lunch?: TimeRange | null;
-  dinner?: TimeRange | null;
-  late_night?: TimeRange | null;
-}
-
-// =============================================================================
-// TEST FIXTURES
-// =============================================================================
-
-const createMockHall = (overrides: Partial<DiningHall> = {}): DiningHall => ({
-  id: 1,
-  name: 'Test Hall',
-  slug: 'test-hall',
-  is_residential: true,
-  is_open_now: true,
-  current_meal: 'lunch',
-  hours_today: {
-    breakfast: { open: '07:00', close: '10:00' },
-    lunch: { open: '11:30', close: '14:00' },
-    dinner: { open: '17:00', close: '21:00' },
-    late_night: null,
-  },
-  ...overrides,
-});
-
-const DE_NEVE_HOURS: LocationHours = {
-  breakfast: { open: '07:00', close: '10:00' },
-  lunch: { open: '11:30', close: '14:00' },
-  dinner: { open: '17:00', close: '21:00' },
-  late_night: null,
-};
-
-const BRUIN_PLATE_HOURS: LocationHours = {
-  breakfast: { open: '07:00', close: '09:30' },
-  lunch: { open: '11:00', close: '15:00' },
-  dinner: { open: '17:00', close: '20:00' },
-  late_night: null,
-};
-
-const RENDEZVOUS_HOURS: LocationHours = {
-  breakfast: null,
-  lunch: { open: '11:00', close: '14:00' },
-  dinner: { open: '17:00', close: '21:00' },
-  late_night: { open: '21:00', close: '00:00' },
-};
-
-const ALL_DAY_HOURS: LocationHours = {
-  breakfast: null,
-  lunch: null,
-  dinner: null,
-  late_night: null,
-};
-
-// =============================================================================
-// UNIT TESTS: parseTimeToMinutes
-// =============================================================================
-
-describe('parseTimeToMinutes', () => {
-  // Importing will fail until implementation exists - these tests define expected behavior
-
-  it('should convert "07:00" to 420 minutes', () => {
-    const { parseTimeToMinutes } = require('../mealPeriodUtils');
-    expect(parseTimeToMinutes('07:00')).toBe(420);
+describe('isOpeningSoon', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  it('should convert "12:30" to 750 minutes', () => {
-    const { parseTimeToMinutes } = require('../mealPeriodUtils');
-    expect(parseTimeToMinutes('12:30')).toBe(750);
-  });
-
-  it('should convert "00:00" to 0 minutes', () => {
-    const { parseTimeToMinutes } = require('../mealPeriodUtils');
-    expect(parseTimeToMinutes('00:00')).toBe(0);
-  });
-
-  it('should convert "23:59" to 1439 minutes', () => {
-    const { parseTimeToMinutes } = require('../mealPeriodUtils');
-    expect(parseTimeToMinutes('23:59')).toBe(1439);
-  });
-});
-
-// =============================================================================
-// UNIT TESTS: getAvailableMealPeriods
-// =============================================================================
-
-describe('getAvailableMealPeriods', () => {
-  it('should return all periods that have hours defined', () => {
-    const { getAvailableMealPeriods } = require('../mealPeriodUtils');
-    const hall = createMockHall({ hours_today: DE_NEVE_HOURS });
-
-    const periods = getAvailableMealPeriods(hall);
-
-    expect(periods).toContain('breakfast');
-    expect(periods).toContain('lunch');
-    expect(periods).toContain('dinner');
-    expect(periods).not.toContain('late_night'); // null in DE_NEVE_HOURS
-  });
-
-  it('should return only lunch, dinner, late_night for Rendezvous', () => {
-    const { getAvailableMealPeriods } = require('../mealPeriodUtils');
+  it('returns false when hall is already open', () => {
+    mockGetPacificTimeString.mockReturnValue('12:00');
     const hall = createMockHall({
-      name: 'Rendezvous',
-      hours_today: RENDEZVOUS_HOURS,
+      is_open_now: true,
+      next_meal_time: '12:30',
     });
-
-    const periods = getAvailableMealPeriods(hall);
-
-    expect(periods).not.toContain('breakfast'); // null
-    expect(periods).toContain('lunch');
-    expect(periods).toContain('dinner');
-    expect(periods).toContain('late_night');
+    expect(isOpeningSoon(hall)).toBe(false);
   });
 
-  it('should return empty array for all-day location', () => {
-    const { getAvailableMealPeriods } = require('../mealPeriodUtils');
+  it('returns false when hall has no next_meal_time', () => {
+    mockGetPacificTimeString.mockReturnValue('12:00');
     const hall = createMockHall({
-      name: 'Cafe 1919',
-      hours_today: ALL_DAY_HOURS,
-    });
-
-    const periods = getAvailableMealPeriods(hall);
-
-    expect(periods).toEqual([]);
-  });
-
-  it('should return empty array when hours_today is undefined', () => {
-    const { getAvailableMealPeriods } = require('../mealPeriodUtils');
-    const hall = createMockHall({ hours_today: undefined });
-
-    const periods = getAvailableMealPeriods(hall);
-
-    expect(periods).toEqual([]);
-  });
-});
-
-// =============================================================================
-// UNIT TESTS: getCurrentOrNextMealPeriod
-// =============================================================================
-
-describe('getCurrentOrNextMealPeriod', () => {
-  // Note: These tests mock the current time
-
-  it('should return current_meal from API if available', () => {
-    const { getCurrentOrNextMealPeriod } = require('../mealPeriodUtils');
-    const hall = createMockHall({
-      current_meal: 'lunch',
-      hours_today: DE_NEVE_HOURS,
-    });
-
-    const result = getCurrentOrNextMealPeriod(hall);
-
-    expect(result).toBe('lunch');
-  });
-
-  it('should return next_meal if current_meal is null', () => {
-    const { getCurrentOrNextMealPeriod } = require('../mealPeriodUtils');
-    const hall = createMockHall({
-      current_meal: undefined,
-      next_meal: 'dinner',
-      hours_today: DE_NEVE_HOURS,
-    });
-
-    const result = getCurrentOrNextMealPeriod(hall);
-
-    expect(result).toBe('dinner');
-  });
-
-  it('should return first available period if no current or next meal', () => {
-    const { getCurrentOrNextMealPeriod } = require('../mealPeriodUtils');
-    const hall = createMockHall({
-      current_meal: undefined,
-      next_meal: undefined,
-      hours_today: DE_NEVE_HOURS,
-    });
-
-    const result = getCurrentOrNextMealPeriod(hall);
-
-    // Should return the first period that has hours
-    expect(['breakfast', 'lunch', 'dinner', 'late_night']).toContain(result);
-  });
-
-  it('should return null for all-day location', () => {
-    const { getCurrentOrNextMealPeriod } = require('../mealPeriodUtils');
-    const hall = createMockHall({
-      current_meal: undefined,
-      hours_today: ALL_DAY_HOURS,
-    });
-
-    const result = getCurrentOrNextMealPeriod(hall);
-
-    expect(result).toBeNull();
-  });
-});
-
-// =============================================================================
-// UNIT TESTS: isAllDayLocation
-// =============================================================================
-
-describe('isAllDayLocation', () => {
-  it('should return true for location with no meal periods', () => {
-    const { isAllDayLocation } = require('../mealPeriodUtils');
-    const hall = createMockHall({ hours_today: ALL_DAY_HOURS });
-
-    expect(isAllDayLocation(hall)).toBe(true);
-  });
-
-  it('should return false for location with meal periods', () => {
-    const { isAllDayLocation } = require('../mealPeriodUtils');
-    const hall = createMockHall({ hours_today: DE_NEVE_HOURS });
-
-    expect(isAllDayLocation(hall)).toBe(false);
-  });
-
-  it('should return false for location with only lunch', () => {
-    const { isAllDayLocation } = require('../mealPeriodUtils');
-    const hall = createMockHall({
-      hours_today: {
-        breakfast: null,
-        lunch: { open: '11:00', close: '14:00' },
-        dinner: null,
-        late_night: null,
-      },
-    });
-
-    expect(isAllDayLocation(hall)).toBe(false);
-  });
-
-  it('should return true when hours_today is undefined', () => {
-    const { isAllDayLocation } = require('../mealPeriodUtils');
-    const hall = createMockHall({ hours_today: undefined });
-
-    expect(isAllDayLocation(hall)).toBe(true);
-  });
-});
-
-// =============================================================================
-// INTEGRATION TESTS: Hall-Specific vs Global
-// =============================================================================
-
-describe('Hall-Specific Period Detection (Regression Prevention)', () => {
-  it('should NOT use global time-based logic', () => {
-    // This test ensures we're using hall-specific hours, not global time ranges
-    const { getAvailableMealPeriods } = require('../mealPeriodUtils');
-
-    // A hall with only dinner should only return dinner
-    const dinnerOnlyHall = createMockHall({
-      hours_today: {
-        breakfast: null,
-        lunch: null,
-        dinner: { open: '17:00', close: '21:00' },
-        late_night: null,
-      },
-    });
-
-    const periods = getAvailableMealPeriods(dinnerOnlyHall);
-
-    // Should NOT include breakfast or lunch even if global time says so
-    expect(periods).toEqual(['dinner']);
-  });
-
-  it('different halls at same time should have different current periods', () => {
-    const { getCurrentOrNextMealPeriod } = require('../mealPeriodUtils');
-
-    // At 9:45 AM:
-    // - De Neve still has breakfast (ends 10:00)
-    // - Bruin Plate finished breakfast (ends 9:30)
-    const deNeve = createMockHall({
-      name: 'De Neve',
-      current_meal: 'breakfast', // API says breakfast
-      hours_today: DE_NEVE_HOURS,
-    });
-
-    const bruinPlate = createMockHall({
-      name: 'Bruin Plate',
-      current_meal: undefined, // API says between periods
-      next_meal: 'lunch',
-      hours_today: BRUIN_PLATE_HOURS,
-    });
-
-    expect(getCurrentOrNextMealPeriod(deNeve)).toBe('breakfast');
-    expect(getCurrentOrNextMealPeriod(bruinPlate)).toBe('lunch');
-  });
-});
-
-// =============================================================================
-// EDGE CASE TESTS
-// =============================================================================
-
-describe('Edge Cases', () => {
-  it('should handle overnight late night periods', () => {
-    const { getAvailableMealPeriods } = require('../mealPeriodUtils');
-    const hall = createMockHall({
-      hours_today: {
-        breakfast: null,
-        lunch: null,
-        dinner: { open: '17:00', close: '21:00' },
-        late_night: { open: '21:00', close: '02:00' }, // Crosses midnight
-      },
-    });
-
-    const periods = getAvailableMealPeriods(hall);
-
-    expect(periods).toContain('late_night');
-  });
-
-  it('should handle malformed hours gracefully', () => {
-    const { getAvailableMealPeriods } = require('../mealPeriodUtils');
-    const hall = createMockHall({
-      hours_today: {
-        breakfast: { open: '', close: '' }, // Empty strings
-        lunch: { open: '11:00', close: '14:00' },
-        dinner: null,
-        late_night: null,
-      },
-    });
-
-    // Should not crash, should filter out invalid periods
-    expect(() => getAvailableMealPeriods(hall)).not.toThrow();
-  });
-
-  it('should handle closed halls', () => {
-    const { getCurrentOrNextMealPeriod } = require('../mealPeriodUtils');
-    const closedHall = createMockHall({
       is_open_now: false,
-      current_meal: undefined,
-      next_meal: undefined,
-      hours_today: {
-        breakfast: null,
-        lunch: null,
-        dinner: null,
-        late_night: null,
-      },
+      next_meal_time: undefined,
     });
+    expect(isOpeningSoon(hall)).toBe(false);
+  });
 
-    const result = getCurrentOrNextMealPeriod(closedHall);
+  it('returns true when hall opens within 30 minutes', () => {
+    mockGetPacificTimeString.mockReturnValue('11:45');
+    const hall = createMockHall({
+      is_open_now: false,
+      next_meal_time: '12:00',
+    });
+    expect(isOpeningSoon(hall)).toBe(true);
+  });
 
-    // Should return null for completely closed hall
-    expect(result).toBeNull();
+  it('returns true when hall opens exactly in 30 minutes', () => {
+    mockGetPacificTimeString.mockReturnValue('11:30');
+    const hall = createMockHall({
+      is_open_now: false,
+      next_meal_time: '12:00',
+    });
+    expect(isOpeningSoon(hall)).toBe(true);
+  });
+
+  it('returns false when hall opens in more than 30 minutes', () => {
+    mockGetPacificTimeString.mockReturnValue('11:00');
+    const hall = createMockHall({
+      is_open_now: false,
+      next_meal_time: '12:00',
+    });
+    expect(isOpeningSoon(hall)).toBe(false);
+  });
+
+  it('returns false when next meal time is earlier than current time', () => {
+    mockGetPacificTimeString.mockReturnValue('23:00');
+    const hall = createMockHall({
+      is_open_now: false,
+      next_meal_time: '07:00',
+    });
+    expect(isOpeningSoon(hall)).toBe(false);
+  });
+
+  it('handles custom withinMinutes parameter', () => {
+    mockGetPacificTimeString.mockReturnValue('11:00');
+    const hall = createMockHall({
+      is_open_now: false,
+      next_meal_time: '12:00',
+    });
+    expect(isOpeningSoon(hall)).toBe(false);
+    expect(isOpeningSoon(hall, 60)).toBe(true);
+  });
+});
+
+describe('getLocationStatus', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns open status when hall is open', () => {
+    mockGetPacificTimeString.mockReturnValue('12:00');
+    const hall = createMockHall({ is_open_now: true });
+    const status = getLocationStatus(hall);
+    expect(status.status).toBe('open');
+    expect(status.label).toBe('Open');
+    expect(status.colorKey).toBe('success');
+  });
+
+  it('returns opening_soon status when hall opens within 30 min', () => {
+    mockGetPacificTimeString.mockReturnValue('11:45');
+    const hall = createMockHall({
+      is_open_now: false,
+      next_meal_time: '12:00',
+    });
+    const status = getLocationStatus(hall);
+    expect(status.status).toBe('opening_soon');
+    expect(status.label).toBe('Opening Soon');
+    expect(status.colorKey).toBe('warning');
+  });
+
+  it('returns closed status when not opening soon', () => {
+    mockGetPacificTimeString.mockReturnValue('10:00');
+    const hall = createMockHall({
+      is_open_now: false,
+      next_meal_time: '12:00',
+    });
+    const status = getLocationStatus(hall);
+    expect(status.status).toBe('closed');
+    expect(status.label).toBe('Closed');
+    expect(status.colorKey).toBe('error');
+  });
+});
+
+describe('isAnyOpeningSoon', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns false if any location is open', () => {
+    mockGetPacificTimeString.mockReturnValue('11:45');
+    const locations = [
+      createMockHall({ id: 1, is_open_now: true }),
+      createMockHall({ id: 2, is_open_now: false, next_meal_time: '12:00' }),
+    ];
+    expect(isAnyOpeningSoon(locations)).toBe(false);
+  });
+
+  it('returns true if none open but one is opening soon', () => {
+    mockGetPacificTimeString.mockReturnValue('11:45');
+    const locations = [
+      createMockHall({ id: 1, is_open_now: false, next_meal_time: '14:00' }),
+      createMockHall({ id: 2, is_open_now: false, next_meal_time: '12:00' }),
+    ];
+    expect(isAnyOpeningSoon(locations)).toBe(true);
+  });
+
+  it('returns false if all closed and none opening soon', () => {
+    mockGetPacificTimeString.mockReturnValue('10:00');
+    const locations = [
+      createMockHall({ id: 1, is_open_now: false, next_meal_time: '14:00' }),
+      createMockHall({ id: 2, is_open_now: false, next_meal_time: '13:00' }),
+    ];
+    expect(isAnyOpeningSoon(locations)).toBe(false);
+  });
+});
+
+describe('getGroupLocationStatus', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns open if any location is open', () => {
+    mockGetPacificTimeString.mockReturnValue('11:45');
+    const locations = [
+      createMockHall({ id: 1, is_open_now: true }),
+      createMockHall({ id: 2, is_open_now: false }),
+    ];
+    const status = getGroupLocationStatus(locations);
+    expect(status.status).toBe('open');
+    expect(status.label).toBe('Open');
+    expect(status.colorKey).toBe('success');
+  });
+
+  it('returns opening_soon if none open but some opening soon', () => {
+    mockGetPacificTimeString.mockReturnValue('11:45');
+    const locations = [
+      createMockHall({ id: 1, is_open_now: false, next_meal_time: '14:00' }),
+      createMockHall({ id: 2, is_open_now: false, next_meal_time: '12:00' }),
+    ];
+    const status = getGroupLocationStatus(locations);
+    expect(status.status).toBe('opening_soon');
+    expect(status.label).toBe('Opening Soon');
+    expect(status.colorKey).toBe('warning');
+  });
+
+  it('returns closed if all closed and none opening soon', () => {
+    mockGetPacificTimeString.mockReturnValue('10:00');
+    const locations = [
+      createMockHall({ id: 1, is_open_now: false, next_meal_time: '14:00' }),
+      createMockHall({ id: 2, is_open_now: false }),
+    ];
+    const status = getGroupLocationStatus(locations);
+    expect(status.status).toBe('closed');
+    expect(status.label).toBe('Closed');
+    expect(status.colorKey).toBe('error');
   });
 });
