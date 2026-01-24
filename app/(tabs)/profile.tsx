@@ -1322,18 +1322,6 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Carb/Fat Ratio Slider - Now using PanResponder (fixed crash) */}
-          {!useCustomTargets && (
-            <View style={styles.carbFatSliderSection}>
-              <CarbFatSlider
-                remainingCalories={tracking.targets.calories - (tracking.targets.protein * 4)}
-                carbFatRatio={carbFatRatio}
-                onRatioChange={handleCarbFatRatioChange}
-                sex={gender ?? 'male'}
-              />
-            </View>
-          )}
-
           {/* Reset to Calculated - only show when custom targets are active */}
           {useCustomTargets && (
             <TouchableOpacity

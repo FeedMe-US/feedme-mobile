@@ -15,14 +15,16 @@ export default function OnboardingLayout() {
       <Stack.Screen name="activity" />
       <Stack.Screen name="meal-plan" />
       <Stack.Screen name="dining-locations" />
-      <Stack.Screen name="meals-per-day" />
       <Stack.Screen name="dietary-requirements" />
       <Stack.Screen name="allergies" />
       <Stack.Screen name="ingredients-avoid" />
       <Stack.Screen name="meal-times" />
       {/* Reminders screen temporarily removed from flow - code kept in reminders.tsx */}
       {/* <Stack.Screen name="reminders" /> */}
-      <Stack.Screen name="swipe-seed" />
+      {/* Swipe seed screen removed from flow - code kept in swipe-seed.tsx */}
+      {/* <Stack.Screen name="swipe-seed" /> */}
+      {/* Meals per day screen removed from flow - code kept in meals-per-day.tsx */}
+      {/* <Stack.Screen name="meals-per-day" /> */}
       <Stack.Screen name="complete" />
     </Stack>
   );
