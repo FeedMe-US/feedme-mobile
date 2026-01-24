@@ -46,9 +46,42 @@ export default function ProgressScreen() {
   useEffect(() => {
     const loadSelectedVitamins = async () => {
       try {
-        const onboardingData = await getOnboardingData();
-        if (onboardingData?.selectedVitamins && onboardingData.selectedVitamins.length > 0) {
-          setSelectedVitamins(onboardingData.selectedVitamins);
+        // Mapping between display names and backend keys
+        const vitaminDisplayToKey: Record<string, string> = {
+          'Vitamin D': 'vitamin_d_mcg',
+          'Vitamin B12': 'vitamin_b12_mcg',
+          'Vitamin C': 'vitamin_c_mg',
+          'Iron': 'iron_mg',
+          'Calcium': 'calcium_mg',
+          'Potassium': 'potassium_mg',
+          'Vitamin A': 'vitamin_a_mcg',
+          'Vitamin B6': 'vitamin_b6_mg',
+        };
+
+        // Try to get from backend first if authenticated
+        let vitaminKeys: string[] = [];
+        try {
+          const profile = await userService.getProfile();
+          if (profile?.tracked_micronutrients?.length) {
+            vitaminKeys = profile.tracked_micronutrients;
+          }
+        } catch (error) {
+          console.warn('Error loading vitamins from backend:', error);
+        }
+
+        // Fall back to local onboarding data if no backend data
+        if (vitaminKeys.length === 0) {
+          const onboardingData = await getOnboardingData();
+          if (onboardingData?.selectedVitamins && onboardingData.selectedVitamins.length > 0) {
+            // Convert display names to backend keys
+            vitaminKeys = onboardingData.selectedVitamins
+              .map(name => vitaminDisplayToKey[name])
+              .filter(key => key !== undefined);
+          }
+        }
+
+        if (vitaminKeys.length > 0) {
+          setSelectedVitamins(vitaminKeys);
         }
       } catch (error) {
         console.warn('Error loading selected vitamins:', error);
