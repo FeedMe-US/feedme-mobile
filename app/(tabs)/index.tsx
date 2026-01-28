@@ -842,7 +842,6 @@ useFocusEffect(
           </View>
         ) : null}
 
-<<<<<<< HEAD
         {/* Recommended Meal Card or Closed Message */}
         {recommendedMeal && recommendedMeal.isClosed && (
           <Card variant="elevated" padding="lg" style={styles.closedCard}>
@@ -897,81 +896,12 @@ useFocusEffect(
                     next.add(mealId);
                   }
                   return next;
-=======
-        {/* Recommended Meal Card */}
-        {recommendedMeal && (() => {
-          // Check if the selected hall is closed
-          const isSelectedHallClosed = selectedHallMode === 'specific' && selectedHallSlug
-            ? !diningHallsData.get(selectedHallSlug)?.isOpen
-            : false;
-
-          // If hall is closed, show closed message with swipeable card
-          if (isSelectedHallClosed) {
-            return (
-              <MealCard
-                diningHall={recommendedMeal.diningHall}
-                mealItems={[]}
-                calories={0}
-                protein={0}
-                carbs={0}
-                fat={0}
-                onSwipeRight={handleSwipeRight}
-                onRefresh={handleRefresh}
-              />
-            );
-          }
-
-          return (
-            <MealCard
-              diningHall={recommendedMeal.diningHall}
-              mealItems={recommendedMeal.mealItems}
-              calories={recommendedMeal.calories}
-              protein={recommendedMeal.protein}
-              carbs={recommendedMeal.carbs}
-              fat={recommendedMeal.fat}
-              onLogAll={handleLogAll}
-              onSelectItems={() => {
-                haptics.medium();
-                router.push({
-                  pathname: '/select-items',
-                  params: {
-                    items: JSON.stringify(
-                      recommendedMeal.mealItems.map((item) => ({
-                        name: item.name,
-                        amount: item.amount,
-                        recipe_id: item.recipe_id,
-                        // Use per-item nutrition if available, fallback to averaged
-                        calories: item.calories ?? Math.round(recommendedMeal.calories / recommendedMeal.mealItems.length),
-                        protein: item.protein ?? Math.round(recommendedMeal.protein / recommendedMeal.mealItems.length),
-                        carbs: item.carbs ?? Math.round(recommendedMeal.carbs / recommendedMeal.mealItems.length),
-                        fat: item.fat ?? Math.round(recommendedMeal.fat / recommendedMeal.mealItems.length),
-                      }))
-                    ),
-                  },
->>>>>>> 3171113a31965f34c4a4306e18f4397ae377d84c
                 });
-              }}
-              onSwipeLeft={handleSwipeLeft}
-              onSwipeRight={handleSwipeRight}
-              onRefresh={handleRefresh}
-              onLike={() => {
-                if (recommendedMeal) {
-                  const mealId = `${recommendedMeal.diningHall}-${recommendedMeal.calories}`;
-                  setLikedMeals((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(mealId)) {
-                      next.delete(mealId);
-                    } else {
-                      next.add(mealId);
-                    }
-                    return next;
-                  });
-                }
-              }}
-              isLiked={recommendedMeal ? likedMeals.has(`${recommendedMeal.diningHall}-${recommendedMeal.calories}`) : false}
-            />
-          );
-        })()}
+              }
+            }}
+            isLiked={recommendedMeal ? likedMeals.has(`${recommendedMeal.diningHall}-${recommendedMeal.calories}`) : false}
+          />
+        )}
 
         {/* Craving Button - below meal card (only when not closed) */}
         {recommendedMeal && !recommendedMeal.isClosed && (
