@@ -7,6 +7,7 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryKeys } from '@/src/lib/queryClient';
 import { api } from '@/src/api';
+import { getPacificDate } from '@/src/utils/dateUtils';
 import type {
   RecommendRequest,
   RecommendResponse,
@@ -63,7 +64,7 @@ export function useDayRecommendation() {
  * Fetch pre-computed day plan (cached on backend)
  */
 export function useDayPlan(planDate?: string) {
-  const date = planDate || new Date().toISOString().split('T')[0];
+  const date = planDate || getPacificDate();
 
   return useQuery({
     queryKey: queryKeys.dayplan.date(date),

@@ -299,6 +299,25 @@ function DailyView({ tracking, macroSplit, selectedVitamins }: { tracking: any; 
     'potassium_mg': 'K',
   };
 
+  // Build a lookup from micronutrient key to its progress data
+  // tracking.micronutrients comes from the backend API response
+  const micronutrientByKey = (tracking.micronutrients || []).reduce(
+    (acc: Record<string, any>, m: any) => {
+      acc[m.key] = m;
+      return acc;
+    },
+    {} as Record<string, any>
+  );
+
+  // Get display value for a vitamin - shows percentage or "--" if no data
+  const getVitaminDisplay = (vitaminKey: string): string => {
+    const data = micronutrientByKey[vitaminKey];
+    if (data && typeof data.pct === 'number') {
+      return `${data.pct}%`;
+    }
+    return '--';
+  };
+
   return (
     <>
       {/* Daily Snapshot Card */}
@@ -370,7 +389,7 @@ function DailyView({ tracking, macroSplit, selectedVitamins }: { tracking: any; 
           {selectedVitamins.map((vitamin) => (
             <View key={vitamin} style={styles.vitaminPill}>
               <Text variant="bodySmall" weight="semibold">
-                {vitaminDisplayMap[vitamin] || vitamin} --
+                {vitaminDisplayMap[vitamin] || vitamin} {getVitaminDisplay(vitamin)}
               </Text>
             </View>
           ))}

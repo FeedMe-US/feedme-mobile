@@ -91,7 +91,7 @@ export default function HomeScreen() {
   }, [selectedHallMode, selectedHallSlug, diningHallsData]);
 
   // Handle generate recommendation
-  const handleGenerate = useCallback(async (includeMood: boolean = true) => {
+  const handleGenerate = useCallback(async (includeMood: boolean = true, excludedRecipeIds?: string[]) => {
     if (!selectedMealPeriod) return;
     if (selectedHallMode === 'specific' && !selectedHallSlug) return;
 
@@ -103,6 +103,7 @@ export default function HomeScreen() {
         {
           mood: includeMood ? (moodText || undefined) : undefined,
           mode: selectedHallMode,
+          excluded_recipe_ids: excludedRecipeIds,
         }
       );
       setRecommendedMeal(result);
@@ -243,7 +244,6 @@ useFocusEffect(
             31: 'epicuria-at-covel',
             // Hill / campus restaurants
             34: 'bruin-cafe',
-            35: 'bruin-bowl',
             36: 'cafe-1919',
             37: 'the-study-at-hedrick',
             38: 'the-drey',
@@ -300,7 +300,6 @@ useFocusEffect(
         { id: 39, name: 'Rendezvous', slug: 'rendezvous', type: 'boutique', is_residential: false, campus_area: 'South', is_open_now: false },
         { id: 37, name: 'The Study at Hedrick', slug: 'the-study-at-hedrick', type: 'boutique', is_residential: false, campus_area: 'Central', is_open_now: false },
         { id: 38, name: 'The Drey', slug: 'the-drey', type: 'boutique', is_residential: false, campus_area: 'North', is_open_now: false },
-        { id: 35, name: 'Bruin Bowl', slug: 'bruin-bowl', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
         { id: 34, name: 'Bruin Cafe', slug: 'bruin-cafe', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
         { id: 36, name: 'Cafe 1919', slug: 'cafe-1919', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
         { id: 41, name: 'Epicuria at Ackerman', slug: 'epicuria-at-ackerman', type: 'boutique', is_residential: false, campus_area: 'Central', is_open_now: false },
@@ -379,7 +378,7 @@ useFocusEffect(
       setDiningHalls([
         'bruin-plate', 'de-neve-dining', 'epicuria-at-covel',
         'spice-kitchen', 'rendezvous', 'the-study-at-hedrick',
-        'the-drey', 'bruin-bowl', 'bruin-cafe', 'cafe-1919'
+        'the-drey', 'bruin-cafe', 'cafe-1919'
       ]);
     }
   };
@@ -474,7 +473,13 @@ useFocusEffect(
     // Force regeneration by updating the key
     const generationKey = `${selectedHallMode}-${selectedHallSlug || 'none'}-${selectedMealPeriod}`;
     lastGenerationKey.current = generationKey + '-refresh';
-    handleGenerate(true);
+
+    // Extract recipe IDs from current meal to exclude them from the new recommendation
+    const currentRecipeIds = recommendedMeal?.mealItems
+      ?.map(item => item.recipe_id)
+      .filter((id): id is string => id !== undefined) || [];
+
+    handleGenerate(true, currentRecipeIds);
   };
 
   const handleRingPress = () => {
@@ -691,7 +696,6 @@ useFocusEffect(
                 'the-study-at-hedrick': 'The Study',
                 'the-study': 'The Study',
                 'the-drey': 'The Drey',
-                'bruin-bowl': 'Bruin Bowl',
                 'bruin-cafe': 'Bruin Cafe',
                 'cafe-1919': 'Cafe 1919',
                 'epicuria-at-ackerman': 'Epicuria at Ackerman',

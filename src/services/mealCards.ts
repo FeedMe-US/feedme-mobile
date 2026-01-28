@@ -133,7 +133,6 @@ const LOCATION_LABELS: Record<number, string> = {
   30: 'Feast at Rieber',
   31: 'Epicuria at Covel',
   34: 'Bruin Café',
-  35: 'Bruin Bowl',
   36: 'Cafe 1919',
   37: 'The Study at Hedrick',
   38: 'The Drey',

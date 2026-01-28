@@ -207,7 +207,6 @@ const FALLBACK_DINING_HALLS: DiningHall[] = [
   { id: 39, name: 'Rendezvous', slug: 'rendezvous', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false, latitude: 34.0710, longitude: -118.4470 },
   { id: 37, name: 'The Study at Hedrick', slug: 'the-study-at-hedrick', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false, latitude: 34.0690, longitude: -118.4450 },
   { id: 38, name: 'The Drey', slug: 'the-drey', type: 'boutique', is_residential: false, campus_area: 'North', is_open_now: false, latitude: 34.0700, longitude: -118.4460 },
-  { id: 35, name: 'Bruin Bowl', slug: 'bruin-bowl', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false, latitude: 34.0688, longitude: -118.4448 },
   { id: 34, name: 'Bruin Cafe', slug: 'bruin-cafe', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false, latitude: 34.0692, longitude: -118.4455 },
   { id: 36, name: 'Cafe 1919', slug: 'cafe-1919', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false, latitude: 34.0685, longitude: -118.4460 },
   { id: 41, name: 'Epicuria at Ackerman', slug: 'epicuria-at-ackerman', type: 'boutique', is_residential: false, campus_area: 'Central', is_open_now: false, latitude: 34.0705, longitude: -118.4430 },
@@ -510,6 +509,7 @@ class MealService {
       mood?: string;
       mode?: 'specific' | 'hill' | 'campus';
       date?: string; // ISO date string (YYYY-MM-DD) for future menu recommendations
+      excluded_recipe_ids?: string[]; // Recipe IDs to exclude (for reroll/refresh)
     }
   ): Promise<MealRecommendation> {
     console.log('[MealService] getRecommendedMealWithOptions called:', {
@@ -553,6 +553,7 @@ class MealService {
       mood?: string;
       area?: 'hill' | 'campus';
       date?: string;
+      excluded_recipe_ids?: string[];
     } = {
       meal_period: mealPeriod,
     };
@@ -571,6 +572,10 @@ class MealService {
 
     if (options?.date) {
       requestBody.date = options.date;
+    }
+
+    if (options?.excluded_recipe_ids && options.excluded_recipe_ids.length > 0) {
+      requestBody.excluded_recipe_ids = options.excluded_recipe_ids;
     }
 
     console.log('[MealService] Calling POST /recommend with:', requestBody);

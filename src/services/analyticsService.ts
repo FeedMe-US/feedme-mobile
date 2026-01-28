@@ -5,6 +5,7 @@
 
 import { apiClient } from './api';
 import { NetworkError, ApiError } from '@/src/types/errors';
+import { toPacificDate } from '@/src/utils/dateUtils';
 
 // Backend response types (matching /user/progress response)
 export interface DailySummary {
@@ -101,7 +102,7 @@ const getMockDailyStats = (days: number): DailyStats[] => {
     date.setDate(date.getDate() - i);
 
     stats.push({
-      date: date.toISOString().split('T')[0],
+      date: toPacificDate(date),
       calories: 2000 + Math.floor(Math.random() * 600) - 300,
       protein: 150 + Math.floor(Math.random() * 60) - 30,
       carbs: 200 + Math.floor(Math.random() * 80) - 40,
@@ -122,7 +123,7 @@ const getMockWeeklyStats = (weeks: number): WeeklyStats[] => {
     weekStart.setDate(weekStart.getDate() - (i * 7) - weekStart.getDay());
 
     stats.push({
-      week_start: weekStart.toISOString().split('T')[0],
+      week_start: toPacificDate(weekStart),
       avg_calories: 2100 + Math.floor(Math.random() * 400) - 200,
       avg_protein: 175 + Math.floor(Math.random() * 50) - 25,
       avg_carbs: 220 + Math.floor(Math.random() * 60) - 30,

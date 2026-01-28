@@ -7,6 +7,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/src/lib/queryClient';
 import { api } from '@/src/api';
+import { getPacificDate } from '@/src/utils/dateUtils';
 import type {
   DailyTrackingResponse,
   LogRequest,
@@ -20,7 +21,7 @@ import type {
  * Fetch daily tracking data for a specific date
  */
 export function useDailyTracking(date?: string) {
-  const trackingDate = date || new Date().toISOString().split('T')[0];
+  const trackingDate = date || getPacificDate();
 
   return useQuery({
     queryKey: queryKeys.tracking.daily(trackingDate),
@@ -68,7 +69,7 @@ export function useLogMeal() {
     },
     onMutate: async (newLog) => {
       // Cancel outgoing refetches
-      const today = new Date().toISOString().split('T')[0];
+      const today = getPacificDate();
       await queryClient.cancelQueries({ queryKey: queryKeys.tracking.daily(today) });
 
       // Snapshot previous value
@@ -80,13 +81,13 @@ export function useLogMeal() {
     onError: (_err, _newLog, context) => {
       // Rollback on error
       if (context?.previousTracking) {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getPacificDate();
         queryClient.setQueryData(queryKeys.tracking.daily(today), context.previousTracking);
       }
     },
     onSettled: () => {
       // Refetch after mutation
-      const today = new Date().toISOString().split('T')[0];
+      const today = getPacificDate();
       queryClient.invalidateQueries({ queryKey: queryKeys.tracking.daily(today) });
       queryClient.invalidateQueries({ queryKey: queryKeys.user.targets() });
     },
@@ -108,7 +109,7 @@ export function useUpdateLog() {
       return response.data as LogResponse;
     },
     onSettled: () => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getPacificDate();
       queryClient.invalidateQueries({ queryKey: queryKeys.tracking.daily(today) });
       queryClient.invalidateQueries({ queryKey: queryKeys.user.targets() });
     },
@@ -130,7 +131,7 @@ export function useDeleteLog() {
       return response.data;
     },
     onSettled: () => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getPacificDate();
       queryClient.invalidateQueries({ queryKey: queryKeys.tracking.daily(today) });
       queryClient.invalidateQueries({ queryKey: queryKeys.user.targets() });
     },
@@ -147,7 +148,7 @@ export function createLogRequest(
   mealDate?: string
 ): LogRequest {
   return {
-    meal_date: mealDate || new Date().toISOString().split('T')[0],
+    meal_date: mealDate || getPacificDate(),
     meal_type: mealType,
     items,
     source,

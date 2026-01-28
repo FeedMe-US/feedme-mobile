@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors, spacing, radius, typography } from '@/src/theme';
+import { getPacificDate } from '@/src/utils/dateUtils';
 import { Text } from '@/src/ui/Text';
 import { haptics } from '@/src/utils/haptics';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -60,7 +61,7 @@ export function ItemSwapSheet({
   const loadMenu = async () => {
     setLoading(true);
     try {
-      const dateStr = new Date().toISOString().split('T')[0];
+      const dateStr = getPacificDate();
       const menu = await mealService.getMenu(locationId, dateStr);
       if (menu && menu.meals[currentMeal]) {
         const mealMenu = menu.meals[currentMeal];

@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logService } from '@/src/services/logService';
+import { getPacificDate } from '@/src/utils/dateUtils';
 import type { MicronutrientProgress } from '@/src/types/api';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
@@ -93,7 +94,7 @@ const defaultTracking: DailyTracking = {
 };
 
 const STORAGE_KEY = '@FeedMe:dailyTracking';
-const getTodayKey = () => `${STORAGE_KEY}:${new Date().toISOString().split('T')[0]}`;
+const getTodayKey = () => `${STORAGE_KEY}:${getPacificDate()}`;
 
 const DailyTrackingContext = createContext<DailyTrackingContextType | undefined>(undefined);
 
@@ -243,7 +244,7 @@ export function DailyTrackingProvider({ children }: { children: ReactNode }) {
     setTracking((prev) => ({ ...prev, isSyncing: true }));
 
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getPacificDate();
       // Use getDailyTracking to get the full response with micronutrients
       const dailyData = await logService.getDailyTracking(today);
 
@@ -252,7 +253,7 @@ export function DailyTrackingProvider({ children }: { children: ReactNode }) {
 
         // Convert backend FoodLogEntry[] to LoggedMeal format
         // Each entry is a flat object with food_name, servings, etc.
-        const meals: LoggedMeal[] = logs.map((entry) => ({
+        const backendMeals: LoggedMeal[] = logs.map((entry) => ({
           id: String(entry.id),
           name: entry.food_name,
           mealType: entry.meal_type,
@@ -270,16 +271,30 @@ export function DailyTrackingProvider({ children }: { children: ReactNode }) {
         // API returns micronutrients as array of MicronutrientProgress
         const micronutrients = (dailyData as { micronutrients?: MicronutrientProgress[] }).micronutrients || [];
 
-        setTracking((prev) => ({
-          ...prev,
-          loggedMeals: meals,
-          consumed: recalculateConsumed(meals),
-          micronutrients,
-          isSyncing: false,
-          lastSyncError: null,
-        }));
+        // Get current unsynced meals before updating state
+        let mergedMeals: LoggedMeal[] = [];
 
-        await saveToStorage(meals);
+        setTracking((prev) => {
+          // MERGE: Keep unsynced local meals that aren't in backend yet
+          const unsyncedLocalMeals = prev.loggedMeals.filter(
+            (local) => !local.synced && !local.backendId
+          );
+
+          // Combine backend meals with unsynced local meals
+          mergedMeals = [...backendMeals, ...unsyncedLocalMeals];
+
+          return {
+            ...prev,
+            loggedMeals: mergedMeals,
+            consumed: recalculateConsumed(mergedMeals),
+            micronutrients,
+            isSyncing: false,
+            lastSyncError: null,
+          };
+        });
+
+        // Save merged meals to storage (preserving unsynced ones)
+        await saveToStorage(mergedMeals);
       } else {
         setTracking((prev) => ({ ...prev, isSyncing: false }));
       }

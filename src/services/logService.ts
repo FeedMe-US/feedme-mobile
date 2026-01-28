@@ -7,6 +7,7 @@
 import { apiClient } from './api';
 import { MealType } from '../store/DailyTrackingContext';
 import { NetworkError, ApiError } from '@/src/types/errors';
+import { getPacificDate } from '@/src/utils/dateUtils';
 import type {
   LogResponse as ApiLogResponse,
   LogItemRequest,
@@ -41,7 +42,7 @@ export const logService = {
     date?: string
   ): Promise<ApiLogResponse | null> {
     try {
-      const mealDate = date || new Date().toISOString().split('T')[0];
+      const mealDate = date || getPacificDate();
       const response = await apiClient.post<ApiLogResponse>('/log', {
         meal_date: mealDate,  // Backend expects meal_date, not date
         meal_type: mealType,

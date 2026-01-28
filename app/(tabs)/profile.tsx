@@ -26,6 +26,7 @@ import { useIsAuthenticated } from '@/src/store/authStore';
 import { apiClient } from '@/src/services/api';
 import { userService } from '@/src/services/userService';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { AllergenSection, AllergenPickerModal, DislikesSection } from '@/src/components/settings';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
@@ -87,7 +88,6 @@ export default function ProfileScreen() {
     'Rendezvous',
     'The Study',
     'The Drey',
-    'Bruin Bowl',
     'Bruin Cafe',
     'Cafe 1919',
     // ASUCLA / LuValle / satellite locations
@@ -105,7 +105,9 @@ export default function ProfileScreen() {
   const goalTypes = ['Cut', 'Maintain', 'Lean Muscle Growth', 'Bulk'];
 
   const [selectedRestrictions, setSelectedRestrictions] = useState<string[]>([]);
-  const [dislikedFoods, setDislikedFoods] = useState<string[]>([]);
+  const [allergenExclusions, setAllergenExclusions] = useState<string[]>([]); // Safety - hard filter
+  const [dislikedFoods, setDislikedFoods] = useState<string[]>([]); // Preference - soft filter
+  const [showAllergenPicker, setShowAllergenPicker] = useState(false);
   const [selectedHalls, setSelectedHalls] = useState<string[]>(['BPlate', 'De Neve Dining']);
   const [selectedVitamins, setSelectedVitamins] = useState<string[]>(['Vitamin D', 'Vitamin B12', 'Iron']);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -135,7 +137,6 @@ export default function ProfileScreen() {
         31: 'Epicuria at Covel',
         // Hill / campus restaurants
         34: 'Bruin Cafe',
-        35: 'Bruin Bowl',
         36: 'Cafe 1919',
         37: 'The Study',
         38: 'The Drey',
@@ -168,7 +169,6 @@ export default function ProfileScreen() {
         'feast': 'Feast',
         'spice-kitchen': 'Feast',
         'the-drey': 'The Drey',
-        'bruin-bowl': 'Bruin Bowl',
         'bruin-cafe': 'Bruin Cafe',
         'cafe-1919': 'Cafe 1919',
         'epicuria-at-ackerman': 'Epicuria at Ackerman',
@@ -257,8 +257,9 @@ export default function ProfileScreen() {
               setSelectedRestrictions(profile.dietary_restrictions);
             }
             if (profile.allergen_exclusions?.length) {
-              setDislikedFoods(profile.allergen_exclusions);
+              setAllergenExclusions(profile.allergen_exclusions);
             }
+            // TODO: Load disliked foods from user_food_preferences when endpoint is available
             if (profile.preferred_locations?.length) {
               const mappedHalls = profile.preferred_locations
                 .map(id => locationIdToName[id])
@@ -391,7 +392,6 @@ export default function ProfileScreen() {
         'Epicuria at Covel': 31,
         // Hill / campus restaurants
         'Bruin Cafe': 34,
-        'Bruin Bowl': 35,
         'Cafe 1919': 36,
         'The Study': 37,
         'The Drey': 38,
@@ -424,7 +424,6 @@ export default function ProfileScreen() {
         'Rendezvous': 'rendezvous',
         'The Study': 'the-study-at-hedrick',
         'The Drey': 'the-drey',
-        'Bruin Bowl': 'bruin-bowl',
         'Bruin Cafe': 'bruin-cafe',
         'Cafe 1919': 'cafe-1919',
         // ASUCLA / LuValle / satellite locations
@@ -1418,69 +1417,53 @@ export default function ProfileScreen() {
           </View>
         </Card>
 
-        {/* Foods You Dislike - Search + Chips */}
+        {/* Dietary Settings - Allergens & Dislikes (per §3.1 of BEHAVIORAL_CONTRACT.md) */}
         <Card variant="elevated" padding="lg" style={styles.card}>
           <Text variant="h4" weight="semibold" style={styles.sectionTitle}>
-            Foods You Dislike
+            Dietary Settings
           </Text>
-          
-          {/* Search Input */}
-          <View style={styles.dislikedFoodInputContainer}>
-            <TextInput
-              style={[
-                styles.dislikedFoodInput,
-                {
-                  backgroundColor: themeColors.background,
-                  color: themeColors.text,
-                  borderColor: themeColors.border,
-                },
-              ]}
-              placeholder="Search and add foods you dislike..."
-              placeholderTextColor={themeColors.textSecondary}
-              value={dislikedFoodSearch}
-              onChangeText={setDislikedFoodSearch}
-              onSubmitEditing={handleAddDislikedFood}
-              returnKeyType="done"
-              autoFocus={false}
-              editable={true}
-            />
-            <TouchableOpacity
-              style={[
-                styles.addFoodButton,
-                {
-                  backgroundColor: themeColors.primary,
-                  opacity: dislikedFoodSearch.trim() ? 1 : 0.5,
-                },
-              ]}
-              onPress={handleAddDislikedFood}
-              disabled={!dislikedFoodSearch.trim()}>
-              <Text style={{ color: themeColors.textInverse, fontSize: 20, fontWeight: 'bold' }}>+</Text>
-            </TouchableOpacity>
-          </View>
 
-          {/* Selected Foods as Chips */}
-          {dislikedFoods.length > 0 && (
-            <View style={styles.scrollViewContainer}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.chipsContainer}>
-                {dislikedFoods.map((food) => (
-                <View key={food} style={styles.dislikedFoodChip}>
-                  <Text variant="caption" weight="medium" style={styles.chipText}>
-                    {food}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => handleRemoveDislikedFood(food)}
-                    style={styles.chipRemove}>
-                    <Text style={styles.chipRemoveText}>×</Text>
-                  </TouchableOpacity>
-                </View>
-                ))}
-              </ScrollView>
-            </View>
-          )}
+          {/* Allergen Exclusions - Safety (hard filter) */}
+          <AllergenSection
+            selectedAllergens={allergenExclusions}
+            onPressAddAllergen={() => setShowAllergenPicker(true)}
+            onRemoveAllergen={(id) => {
+              const newAllergens = allergenExclusions.filter((a) => a !== id);
+              setAllergenExclusions(newAllergens);
+              // Sync to backend
+              userService.updateProfile({ allergen_exclusions: newAllergens }).catch(console.error);
+            }}
+          />
+
+          <View style={styles.sectionDivider} />
+
+          {/* Disliked Foods - Preference (soft filter) */}
+          <DislikesSection
+            dislikedFoods={dislikedFoods}
+            onAddDislike={(food) => {
+              if (!dislikedFoods.includes(food)) {
+                setDislikedFoods([...dislikedFoods, food]);
+                // TODO: Sync to backend via preference endpoint when available
+              }
+            }}
+            onRemoveDislike={(food) => {
+              setDislikedFoods(dislikedFoods.filter((f) => f !== food));
+              // TODO: Sync to backend via preference endpoint when available
+            }}
+          />
         </Card>
+
+        {/* Allergen Picker Modal */}
+        <AllergenPickerModal
+          visible={showAllergenPicker}
+          onClose={() => setShowAllergenPicker(false)}
+          selectedAllergens={allergenExclusions}
+          onSave={(newAllergens) => {
+            setAllergenExclusions(newAllergens);
+            // Sync to backend
+            userService.updateProfile({ allergen_exclusions: newAllergens }).catch(console.error);
+          }}
+        />
 
         {/* Dining Hall Preferences */}
         <Card variant="elevated" padding="lg" style={styles.card}>
@@ -2301,6 +2284,11 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radius.md,
     marginBottom: spacing.sm,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: '#E5E5E5',
+    marginVertical: spacing.md,
   },
   dislikedFoodInputContainer: {
     flexDirection: 'row',

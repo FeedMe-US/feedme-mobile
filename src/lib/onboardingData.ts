@@ -121,7 +121,6 @@ export function onboardingDataToProfile(data: OnboardingData) {
     'the-study': 37,
     'the-study-at-hedrick': 37,
     'the-drey': 38,
-    'bruin-bowl': 35,
     'bruin-cafe': 34,
     'cafe-1919': 36,
     'epicuria-at-ackerman': 41,

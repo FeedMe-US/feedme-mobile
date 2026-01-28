@@ -96,3 +96,45 @@ export function formatPacificDate(date: Date | string): string {
   });
   return formatter.format(d);
 }
+
+// =============================================================================
+// Spec-compliant aliases (per §6.1 of BEHAVIORAL_CONTRACT.md)
+// =============================================================================
+
+/**
+ * Get the current date in Pacific timezone as YYYY-MM-DD string.
+ * This is the canonical date format for all FeedMe cache keys and API calls.
+ *
+ * CRITICAL: Always use this for:
+ * - AsyncStorage keys
+ * - meal_date in API requests
+ * - Log retrieval date parameters
+ *
+ * @example
+ * getPacificDate() // "2026-01-27"
+ */
+export function getPacificDate(): string {
+  return getPacificDateString();
+}
+
+/**
+ * Get Pacific date for a specific timestamp.
+ */
+export function toPacificDate(date: Date): string {
+  return getPacificDateString(date);
+}
+
+/**
+ * Check if a given date string matches today in Pacific timezone.
+ */
+export function isPacificToday(dateStr: string): boolean {
+  return dateStr === getPacificDate();
+}
+
+/**
+ * Get Pacific time as HH:mm string (for comparing with API hours).
+ * Alias for getPacificTimeString for spec compliance.
+ */
+export function getPacificTime(): string {
+  return getPacificTimeString();
+}

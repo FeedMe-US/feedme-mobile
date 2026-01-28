@@ -5,6 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from './api';
+import { getPacificDate } from '@/src/utils/dateUtils';
 
 export interface FoodItem {
   id: string;
@@ -70,7 +71,7 @@ let menuItemsCache: FoodItem[] = [];
  * Fetch menu items from a location and cache them for searching
  */
 async function fetchMenuItems(locationId: number): Promise<FoodItem[]> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getPacificDate();
   const response = await apiClient.get<MenuResponse>(`/menu/${locationId}/${today}`);
 
   if (!response.data?.meals) {

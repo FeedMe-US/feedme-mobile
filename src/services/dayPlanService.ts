@@ -5,6 +5,7 @@
 
 import { apiClient } from './api';
 import { MacroTotals, PlateItem } from './recommendService';
+import { getPacificDate } from '@/src/utils/dateUtils';
 
 // Types matching backend schemas
 export interface DayPlanPlate {
@@ -82,7 +83,7 @@ class DayPlanService {
    * @returns Day plan response or null if unavailable
    */
   async getDayPlan(date?: string): Promise<DayPlanResponse | null> {
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || getPacificDate();
 
     // Check cache first
     if (cachedDayPlan && cachedDate === targetDate && serviceStatus.lastFetch) {
