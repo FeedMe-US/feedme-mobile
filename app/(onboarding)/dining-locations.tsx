@@ -81,7 +81,7 @@ export default function DiningLocationsScreen() {
     if (selectedLocations.size > 0) {
       const locationSlugs = Array.from(selectedLocations);
       await saveOnboardingData({ preferredDiningLocations: locationSlugs });
-      router.push('/(onboarding)/meals-per-day');
+      router.push('/(onboarding)/dietary-requirements');
     }
   };
 

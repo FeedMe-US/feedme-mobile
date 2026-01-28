@@ -53,6 +53,7 @@ export default function HomeScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollPositionRef = useRef<number>(0);
   const hasLoadedOnce = useRef(false);
+  const [selectedVitamins, setSelectedVitamins] = useState<string[]>([]);
 
   // Modal state for craving selection
   const [showCravingModal, setShowCravingModal] = useState(false);
@@ -126,6 +127,58 @@ export default function HomeScreen() {
     if (hour < 12) setGreeting('Good Morning');
     else if (hour < 17) setGreeting('Good Afternoon');
     else setGreeting('Good Evening');
+  }, []);
+
+  // Load selected vitamins from profile/onboarding
+  useEffect(() => {
+    const loadSelectedVitamins = async () => {
+      try {
+        // Mapping between display names and backend keys
+        const vitaminDisplayToKey: Record<string, string> = {
+          'Vitamin D': 'vitamin_d_mcg',
+          'Vitamin B12': 'vitamin_b12_mcg',
+          'Vitamin C': 'vitamin_c_mg',
+          'Iron': 'iron_mg',
+          'Calcium': 'calcium_mg',
+          'Potassium': 'potassium_mg',
+          'Vitamin A': 'vitamin_a_mcg',
+          'Vitamin B6': 'vitamin_b6_mg',
+        };
+
+        // Try to get from backend first if authenticated
+        let vitaminDisplayNames: string[] = [];
+        try {
+          const profile = await userService.getProfile();
+          if (profile?.tracked_micronutrients?.length) {
+            // Map backend keys to display names
+            const keyToDisplay: Record<string, string> = Object.fromEntries(
+              Object.entries(vitaminDisplayToKey).map(([k, v]) => [v, k])
+            );
+            vitaminDisplayNames = profile.tracked_micronutrients
+              .map(key => keyToDisplay[key])
+              .filter(name => name !== undefined);
+          }
+        } catch (error) {
+          console.warn('[Home] Error loading vitamins from backend:', error);
+        }
+
+        // Fall back to local onboarding data if no backend data
+        if (vitaminDisplayNames.length === 0) {
+          const onboardingData = await getOnboardingData();
+          vitaminDisplayNames = onboardingData.selectedVitamins || [];
+        }
+
+        // Convert display names to backend keys for filtering
+        const vitaminKeys = vitaminDisplayNames
+          .map(name => vitaminDisplayToKey[name])
+          .filter(key => key !== undefined);
+        
+        setSelectedVitamins(vitaminKeys);
+      } catch (error) {
+        console.warn('[Home] Error loading selected vitamins:', error);
+      }
+    };
+    loadSelectedVitamins();
   }, []);
 
   // Refresh daily tracking (including micronutrients) when screen gains focus
@@ -345,13 +398,11 @@ useFocusEffect(
         }
       });
 
-      const openHalls = mergedHalls.filter(h => h.is_open_now && !preferredSlugs.includes(h.slug));
-
-      // Combine: preferred halls first (open preferred first, then closed preferred), then other open halls
+      // Only show preferred halls (no other open halls)
+      // Sort: open preferred first, then closed preferred
       const sortedHalls = [
         ...preferredHalls.filter(h => h.is_open_now),
         ...preferredHalls.filter(h => !h.is_open_now),
-        ...openHalls,
       ].sort((a, b) => {
         // Within each group, sort alphabetically
         return a.name.localeCompare(b.name);
@@ -584,66 +635,61 @@ useFocusEffect(
             </View>
           </View>
 
-          {/* Micronutrient Progress - only show if user has tracked vitamins */}
-          {tracking.micronutrients.length > 0 && (
-            <View style={styles.micronutrientSection}>
-              <View style={styles.micronutrientHeader}>
-                <Text variant="caption" color="secondary">
-                  Vitamins & Minerals
-                </Text>
-              </View>
-              <View style={styles.micronutrientGrid}>
-                {tracking.micronutrients.slice(0, 4).map((nutrient) => (
-                  <View key={nutrient.key} style={styles.micronutrientItem}>
-                    <View style={styles.micronutrientProgress}>
-                      <View
-                        style={[
-                          styles.micronutrientBar,
-                          {
-                            backgroundColor: themeColors.border,
-                          },
-                        ]}>
+          {/* Micronutrient Progress - only show selected vitamins with real data */}
+          {(() => {
+            // Filter to only show selected vitamins that have data
+            const filteredNutrients = tracking.micronutrients.filter(
+              nutrient => selectedVitamins.includes(nutrient.key) && nutrient.pct > 0
+            );
+            
+            if (filteredNutrients.length === 0) return null;
+            
+            return (
+              <View style={styles.micronutrientSection}>
+                <View style={styles.micronutrientHeader}>
+                  <Text variant="caption" color="secondary">
+                    Vitamins & Minerals
+                  </Text>
+                </View>
+                <View style={styles.micronutrientGrid}>
+                  {filteredNutrients.slice(0, 4).map((nutrient) => (
+                    <View key={nutrient.key} style={styles.micronutrientItem}>
+                      <View style={styles.micronutrientProgress}>
                         <View
                           style={[
-                            styles.micronutrientBarFill,
+                            styles.micronutrientBar,
                             {
-                              backgroundColor: nutrient.pct >= 100 ? themeColors.success : themeColors.primary,
-                              width: `${Math.min(100, nutrient.pct)}%`,
+                              backgroundColor: themeColors.border,
                             },
-                          ]}
-                        />
+                          ]}>
+                          <View
+                            style={[
+                              styles.micronutrientBarFill,
+                              {
+                                backgroundColor: nutrient.pct >= 100 ? themeColors.success : themeColors.primary,
+                                width: `${Math.min(100, nutrient.pct)}%`,
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text variant="caption" color="secondary" style={styles.micronutrientPct}>
+                          {nutrient.pct}%
+                        </Text>
                       </View>
-                      <Text variant="caption" color="secondary" style={styles.micronutrientPct}>
-                        {nutrient.pct}%
+                      <Text variant="caption" color="secondary" style={styles.micronutrientLabel}>
+                        {nutrient.display_name}
                       </Text>
                     </View>
-                    <Text variant="caption" color="secondary" style={styles.micronutrientLabel}>
-                      {nutrient.display_name}
-                    </Text>
-                  </View>
-                ))}
+                  ))}
+                </View>
               </View>
-            </View>
-          )}
+            );
+          })()}
         </Card>
 
         {/* Dining Hall Selector */}
         {diningHalls.length > 0 ? (
           <View style={styles.diningHallSection}>
-            {/* Show message if all dining halls are closed */}
-            {(() => {
-              const hasOpenHalls = Array.from(diningHallsData.values()).some(hall => hall.isOpen);
-              if (!hasOpenHalls && diningHalls.length > 0) {
-                return (
-                  <Card variant="elevated" padding="md" style={styles.closedMessageCard}>
-                    <Text variant="body" color="secondary" style={styles.closedMessageText}>
-                      Dining halls are closed right now. Recommendations will use placeholder data until they reopen.
-                    </Text>
-                  </Card>
-                );
-              }
-              return null;
-            })()}
             <View style={styles.diningHallLabel}>
               <Text variant="h4" weight="semibold">
                 Where are you eating?
@@ -710,10 +756,13 @@ useFocusEffect(
                 'luvalle-panini': 'LuValle: Northern Lights Panini',
                 'synapse': 'Synapse',
               };
-                const hallName = hallNameMap[hallSlug] || hallSlug
+                // Clean up hall name - remove any "Closed" suffix that might be in the name
+                let hallName = hallNameMap[hallSlug] || hallSlug
                   .split('-')
                   .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
                   .join(' ');
+                // Remove "Closed" suffix if present
+                hallName = hallName.replace(/\s*\(?Closed\)?/gi, '').trim();
                 const isOpen = diningHallsData.get(hallSlug)?.isOpen ?? true;
                 const chipStyle = !isOpen
                   ? { ...styles.diningHallChip, opacity: 0.6 }
@@ -721,7 +770,7 @@ useFocusEffect(
                 return (
                   <Chip
                     key={hallSlug}
-                    label={hallName + (isOpen ? '' : ' (Closed)')}
+                    label={hallName}
                     selected={selectedHallMode === 'specific' && selectedHallSlug === hallSlug}
                     onPress={() => {
                       haptics.light();
@@ -738,10 +787,10 @@ useFocusEffect(
         ) : (
           <Card variant="elevated" padding="lg" style={styles.closedCard}>
             <Text variant="h4" weight="semibold" style={styles.closedTitle}>
-              All dining halls are closed
+              No dining Halls are Open
             </Text>
-            <Text variant="body" color="secondary">
-              Check back during regular dining hours for meal recommendations
+            <Text variant="body" color="secondary" style={styles.closedMessage}>
+              Swipe left to track off-campus nutrition
             </Text>
           </Card>
         )}
@@ -793,6 +842,7 @@ useFocusEffect(
           </View>
         ) : null}
 
+<<<<<<< HEAD
         {/* Recommended Meal Card or Closed Message */}
         {recommendedMeal && recommendedMeal.isClosed && (
           <Card variant="elevated" padding="lg" style={styles.closedCard}>
@@ -847,12 +897,81 @@ useFocusEffect(
                     next.add(mealId);
                   }
                   return next;
+=======
+        {/* Recommended Meal Card */}
+        {recommendedMeal && (() => {
+          // Check if the selected hall is closed
+          const isSelectedHallClosed = selectedHallMode === 'specific' && selectedHallSlug
+            ? !diningHallsData.get(selectedHallSlug)?.isOpen
+            : false;
+
+          // If hall is closed, show closed message with swipeable card
+          if (isSelectedHallClosed) {
+            return (
+              <MealCard
+                diningHall={recommendedMeal.diningHall}
+                mealItems={[]}
+                calories={0}
+                protein={0}
+                carbs={0}
+                fat={0}
+                onSwipeRight={handleSwipeRight}
+                onRefresh={handleRefresh}
+              />
+            );
+          }
+
+          return (
+            <MealCard
+              diningHall={recommendedMeal.diningHall}
+              mealItems={recommendedMeal.mealItems}
+              calories={recommendedMeal.calories}
+              protein={recommendedMeal.protein}
+              carbs={recommendedMeal.carbs}
+              fat={recommendedMeal.fat}
+              onLogAll={handleLogAll}
+              onSelectItems={() => {
+                haptics.medium();
+                router.push({
+                  pathname: '/select-items',
+                  params: {
+                    items: JSON.stringify(
+                      recommendedMeal.mealItems.map((item) => ({
+                        name: item.name,
+                        amount: item.amount,
+                        recipe_id: item.recipe_id,
+                        // Use per-item nutrition if available, fallback to averaged
+                        calories: item.calories ?? Math.round(recommendedMeal.calories / recommendedMeal.mealItems.length),
+                        protein: item.protein ?? Math.round(recommendedMeal.protein / recommendedMeal.mealItems.length),
+                        carbs: item.carbs ?? Math.round(recommendedMeal.carbs / recommendedMeal.mealItems.length),
+                        fat: item.fat ?? Math.round(recommendedMeal.fat / recommendedMeal.mealItems.length),
+                      }))
+                    ),
+                  },
+>>>>>>> 3171113a31965f34c4a4306e18f4397ae377d84c
                 });
-              }
-            }}
-            isLiked={recommendedMeal ? likedMeals.has(`${recommendedMeal.diningHall}-${recommendedMeal.calories}`) : false}
-          />
-        )}
+              }}
+              onSwipeLeft={handleSwipeLeft}
+              onSwipeRight={handleSwipeRight}
+              onRefresh={handleRefresh}
+              onLike={() => {
+                if (recommendedMeal) {
+                  const mealId = `${recommendedMeal.diningHall}-${recommendedMeal.calories}`;
+                  setLikedMeals((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(mealId)) {
+                      next.delete(mealId);
+                    } else {
+                      next.add(mealId);
+                    }
+                    return next;
+                  });
+                }
+              }}
+              isLiked={recommendedMeal ? likedMeals.has(`${recommendedMeal.diningHall}-${recommendedMeal.calories}`) : false}
+            />
+          );
+        })()}
 
         {/* Craving Button - below meal card (only when not closed) */}
         {recommendedMeal && !recommendedMeal.isClosed && (
@@ -1124,6 +1243,9 @@ const styles = StyleSheet.create({
   },
   closedTitle: {
     marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  closedMessage: {
     textAlign: 'center',
   },
   closedMessageCard: {

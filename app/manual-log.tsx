@@ -120,13 +120,14 @@ export default function ManualLogScreen() {
     if (!selectedFood) return;
 
     haptics.success();
+    // Store per-serving nutrition values (not pre-multiplied by quantity)
     addMeal({
       name: selectedFood.name,
       mealType: selectedMeal,
-      calories: selectedFood.calories * quantity,
-      protein: selectedFood.protein * quantity,
-      carbs: selectedFood.carbs * quantity,
-      fats: selectedFood.fat * quantity,
+      calories: selectedFood.calories,
+      protein: selectedFood.protein,
+      carbs: selectedFood.carbs,
+      fats: selectedFood.fat,
       quantity: quantity,
     });
     foodService.addToRecent(selectedFood.id);

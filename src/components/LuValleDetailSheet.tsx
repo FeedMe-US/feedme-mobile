@@ -222,14 +222,15 @@ export function LuValleDetailSheet({
     haptics.success();
 
     // Log each plate item with its quantity
+    // Store per-serving nutrition values (not pre-multiplied by quantity)
     plate.forEach(({ item, quantity }) => {
       addMeal({
         name: item.name,
         mealType: 'lunch', // LuValle is primarily a lunch destination
-        calories: Math.round(item.calories * quantity),
-        protein: Math.round(item.protein_g * quantity),
-        carbs: Math.round(item.carbs_g * quantity),
-        fats: Math.round(item.fat_g * quantity),
+        calories: Math.round(item.calories),
+        protein: Math.round(item.protein_g),
+        carbs: Math.round(item.carbs_g),
+        fats: Math.round(item.fat_g),
         quantity,
       });
     });

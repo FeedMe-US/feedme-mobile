@@ -223,7 +223,7 @@ export function MealCard({
   return (
     <View style={[styles.wrapper, style]}>
       {/* Swipe Action Hints */}
-          {onSwipeLeft && (
+          {mealItems.length > 0 && onSwipeLeft && (
             <SwipeActionHint
               translation={translateX}
               direction="left"
@@ -239,6 +239,7 @@ export function MealCard({
               icon="plus"
               label="Add Items"
               color={themeColors.primary}
+              hideIdlePeek={mealItems.length === 0}
             />
           )}
 
@@ -248,132 +249,157 @@ export function MealCard({
             variant="elevated"
             padding="lg"
             style={styles.card}>
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <Text variant="h4" weight="semibold" style={styles.diningHall}>
-                {diningHall}
-              </Text>
-              <View style={styles.headerButtons}>
-                <TouchableOpacity
-                  onPress={onRefresh}
-                  style={styles.refreshButton}
-                  activeOpacity={0.7}>
-                  <RefreshIcon size={20} color={themeColors.text} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleLike}
-                  style={styles.heartButton}
-                  activeOpacity={0.7}>
-                  <AppIcon
-                    type={liked ? 'heart-filled' : 'heart'}
-                    size={20}
-                    color={liked ? '#FF69B4' : themeColors.text}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-            <Text variant="bodySmall" color="secondary">
-              Recommended Meal
-            </Text>
-          </View>
-
-          <View style={styles.itemsContainer}>
-            {mealItems.map((item, index) => (
-              <View key={index} style={styles.mealItem}>
-                <Text variant="body" style={styles.itemName}>
-                  {item.name}
-                </Text>
-                <Text variant="bodySmall" color="secondary">
-                  {item.amount}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Macros - Clean horizontal layout matching screenshot */}
-          <View style={styles.macroSummary}>
-            <View style={styles.macroRow}>
-              <View style={styles.macroItem}>
-                <Text variant="body" weight="bold" style={[styles.macroValue, { color: themeColors.text }]}>
-                  {formatCalories(calories)}
-                </Text>
-                <Text variant="caption" color="secondary" style={styles.macroLabel}>
-                  cal
-                </Text>
-              </View>
-              <View style={styles.macroItem}>
-                <Text variant="body" weight="bold" style={[styles.macroValue, { color: themeColors.protein }]}>
-                  {formatMacro(protein)}g
-                </Text>
-                <Text variant="caption" color="secondary" style={styles.macroLabel}>
-                  protein
-                </Text>
-              </View>
-              <View style={styles.macroItem}>
-                <Text variant="body" weight="bold" style={[styles.macroValue, { color: themeColors.carbs }]}>
-                  {formatMacro(carbs)}g
-                </Text>
-                <Text variant="caption" color="secondary" style={styles.macroLabel}>
-                  carbs
-                </Text>
-              </View>
-              <View style={styles.macroItem}>
-                <Text variant="body" weight="bold" style={[styles.macroValue, { color: themeColors.fats }]}>
-                  {formatMacro(fat)}g
-                </Text>
-                <Text variant="caption" color="secondary" style={styles.macroLabel}>
-                  fat
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Actions - Polished buttons with icons */}
-          <View style={styles.actions}>
-            <Animated.View style={[styles.logAllButtonWrapper, logButtonAnimatedStyle]}>
-              <TouchableOpacity
-                style={[
-                  styles.logAllButtonInner,
-                  { 
-                    backgroundColor: isLogged ? themeColors.success : themeColors.primary 
-                  },
-                  colorScheme === 'dark' && {
-                    shadowColor: isLogged ? themeColors.success : '#0a7ea4',
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.15,
-                    shadowRadius: 10,
-                    ...(Platform.OS === 'android' && {
-                      elevation: 8,
-                    }),
-                  },
-                ]}
-                onPress={handleLogAll}
-                activeOpacity={0.8}
-                disabled={isLogged}>
-                <View style={styles.buttonIcon}>
-                  <AppIcon 
-                    type={isLogged ? "check" : "plus"} 
-                    size={16} 
-                    color={themeColors.textInverse} 
-                  />
+          {mealItems.length > 0 ? (
+            <>
+              <View style={styles.header}>
+                <View style={styles.headerLeft}>
+                  <Text variant="h4" weight="semibold" style={styles.diningHall}>
+                    {diningHall}
+                  </Text>
+                  <View style={styles.headerButtons}>
+                    <TouchableOpacity
+                      onPress={onRefresh}
+                      style={styles.refreshButton}
+                      activeOpacity={0.7}>
+                      <RefreshIcon size={20} color={themeColors.text} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleLike}
+                      style={styles.heartButton}
+                      activeOpacity={0.7}>
+                      <AppIcon
+                        type={liked ? 'heart-filled' : 'heart'}
+                        size={20}
+                        color={liked ? '#FF69B4' : themeColors.text}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <Text variant="body" weight="semibold" style={{ color: themeColors.textInverse }}>
-                  {isLogged ? "Logged!" : "Log All"}
+                <Text variant="bodySmall" color="secondary">
+                  Recommended Meal
                 </Text>
-              </TouchableOpacity>
-            </Animated.View>
-            <TouchableOpacity
-              style={[styles.selectItemsButton, { borderColor: themeColors.primary }]}
-              onPress={onSelectItems}
-              activeOpacity={0.8}>
-              <View style={[styles.buttonIcon, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: themeColors.primary }]}>
-                <AppIcon type="check" size={16} color={themeColors.primary} />
               </View>
-              <Text variant="body" weight="semibold" style={{ color: themeColors.text }}>
-                Select Items
-              </Text>
-            </TouchableOpacity>
-          </View>
+              <View style={styles.itemsContainer}>
+                {mealItems.map((item, index) => (
+                  <View key={index} style={styles.mealItem}>
+                    <Text variant="body" style={styles.itemName}>
+                      {item.name}
+                    </Text>
+                    <Text variant="bodySmall" color="secondary">
+                      {item.amount}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={[styles.header, styles.closedHeader]}>
+                <Text variant="h4" weight="semibold" style={styles.closedTitle}>
+                  {diningHall}
+                </Text>
+              </View>
+              <View style={styles.closedMessageContainer}>
+                <Text variant="body" color="secondary" style={styles.closedMessage}>
+                  This dining hall is currently closed
+                </Text>
+                {onSwipeRight && (
+                  <Text variant="bodySmall" color="secondary" style={styles.closedHint}>
+                    Swipe right to track off-campus nutrition
+                  </Text>
+                )}
+              </View>
+            </>
+          )}
+
+          {/* Macros - Only show if there are meal items */}
+          {mealItems.length > 0 && (
+            <>
+              <View style={styles.macroSummary}>
+                <View style={styles.macroRow}>
+                  <View style={styles.macroItem}>
+                    <Text variant="body" weight="bold" style={[styles.macroValue, { color: themeColors.text }]}>
+                      {formatCalories(calories)}
+                    </Text>
+                    <Text variant="caption" color="secondary" style={styles.macroLabel}>
+                      cal
+                    </Text>
+                  </View>
+                  <View style={styles.macroItem}>
+                    <Text variant="body" weight="bold" style={[styles.macroValue, { color: themeColors.protein }]}>
+                      {formatMacro(protein)}g
+                    </Text>
+                    <Text variant="caption" color="secondary" style={styles.macroLabel}>
+                      protein
+                    </Text>
+                  </View>
+                  <View style={styles.macroItem}>
+                    <Text variant="body" weight="bold" style={[styles.macroValue, { color: themeColors.carbs }]}>
+                      {formatMacro(carbs)}g
+                    </Text>
+                    <Text variant="caption" color="secondary" style={styles.macroLabel}>
+                      carbs
+                    </Text>
+                  </View>
+                  <View style={styles.macroItem}>
+                    <Text variant="body" weight="bold" style={[styles.macroValue, { color: themeColors.fats }]}>
+                      {formatMacro(fat)}g
+                    </Text>
+                    <Text variant="caption" color="secondary" style={styles.macroLabel}>
+                      fat
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Actions - Polished buttons with icons */}
+              <View style={styles.actions}>
+                <Animated.View style={[styles.logAllButtonWrapper, logButtonAnimatedStyle]}>
+                  <TouchableOpacity
+                    style={[
+                      styles.logAllButtonInner,
+                      { 
+                        backgroundColor: isLogged ? themeColors.success : themeColors.primary 
+                      },
+                      colorScheme === 'dark' && {
+                        shadowColor: isLogged ? themeColors.success : '#0a7ea4',
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 0.15,
+                        shadowRadius: 10,
+                        ...(Platform.OS === 'android' && {
+                          elevation: 8,
+                        }),
+                      },
+                    ]}
+                    onPress={handleLogAll}
+                    activeOpacity={0.8}
+                    disabled={isLogged}>
+                    <View style={styles.buttonIcon}>
+                      <AppIcon 
+                        type={isLogged ? "check" : "plus"} 
+                        size={16} 
+                        color={themeColors.textInverse} 
+                      />
+                    </View>
+                    <Text variant="body" weight="semibold" style={{ color: themeColors.textInverse }}>
+                      {isLogged ? "Logged!" : "Log All"}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+                <TouchableOpacity
+                  style={[styles.selectItemsButton, { borderColor: themeColors.primary }]}
+                  onPress={onSelectItems}
+                  activeOpacity={0.8}>
+                  <View style={[styles.buttonIcon, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: themeColors.primary }]}>
+                    <AppIcon type="check" size={16} color={themeColors.primary} />
+                  </View>
+                  <Text variant="body" weight="semibold" style={{ color: themeColors.text }}>
+                    Select Items
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </Card>
       </Animated.View>
     </GestureDetector>
@@ -510,5 +536,26 @@ const styles = StyleSheet.create({
     color: '#4FC3F7',
     fontWeight: '600',
     lineHeight: 16,
+  },
+  closedHeader: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  closedTitle: {
+    textAlign: 'center',
+  },
+  closedMessageContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  },
+  closedMessage: {
+    textAlign: 'center',
+  },
+  closedHint: {
+    textAlign: 'center',
   },
 });

@@ -22,6 +22,7 @@ export interface SwipeActionHintProps {
   icon: AppIconType | string;
   label: string;
   color?: string;
+  hideIdlePeek?: boolean; // If true, don't show subtle peek when idle
 }
 
 export function SwipeActionHint({
@@ -30,6 +31,7 @@ export function SwipeActionHint({
   icon,
   label,
   color,
+  hideIdlePeek = false,
 }: SwipeActionHintProps) {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'dark'];
@@ -65,7 +67,7 @@ export function SwipeActionHint({
         );
       } else {
         // Show subtle peek when idle (slight negative translation hint)
-        opacity = 0.1;
+        opacity = hideIdlePeek ? 0 : 0.1;
         scale = 0.7;
       }
     } else if (direction === 'right') {
@@ -90,8 +92,8 @@ export function SwipeActionHint({
           Extrapolate.CLAMP
         );
       } else {
-        // Show subtle peek when idle
-        opacity = 0.1;
+        // Show subtle peek when idle (unless hideIdlePeek is true)
+        opacity = hideIdlePeek ? 0 : 0.1;
         scale = 0.7;
       }
     } else if (direction === 'up') {

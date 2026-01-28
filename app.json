@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "ucnutrition",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "bundleIdentifier": "com.feedme.ucnutrition",
       "supportsTablet": true,

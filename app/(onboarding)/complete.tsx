@@ -67,10 +67,9 @@ export default function CompleteScreen() {
       setTimeout(() => {
         console.log('[Onboarding] Timer fired, isMounted:', isMounted.current);
         if (isMounted.current) {
-          // Navigate to swipe-seed step (final frontend-only onboarding step).
-          // Auth gate will handle any edge cases afterwards.
-          console.log('[Onboarding] Navigating to swipe-seed step...');
-          router.replace('/(onboarding)/swipe-seed');
+          // Navigate directly to main app (swipe-seed step removed)
+          console.log('[Onboarding] Navigating to main app...');
+          router.replace('/(tabs)');
         } else {
           console.log('[Onboarding] Component unmounted, skipping navigation');
         }

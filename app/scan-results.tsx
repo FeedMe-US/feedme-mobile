@@ -301,14 +301,15 @@ export default function ScanResultsScreen() {
     await logService.logMeal(logItems, mealType, source);
 
     // Update local tracking context
+    // Store per-serving nutrition values (not pre-multiplied by servings)
     editableItems.forEach((item) => {
       addMeal({
         name: item.name,
         mealType: mealType,
-        calories: Math.round(item.calories * item.servings),
-        protein: Math.round(item.protein * item.servings),
-        carbs: Math.round(item.carbs * item.servings),
-        fats: Math.round(item.fat * item.servings),
+        calories: Math.round(item.calories),
+        protein: Math.round(item.protein),
+        carbs: Math.round(item.carbs),
+        fats: Math.round(item.fat),
         quantity: item.servings,
       });
     });

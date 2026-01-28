@@ -190,14 +190,15 @@ export function DiningHallDetailSheet({
     const logMealType = selectedPeriod === 'late_night' ? 'snack' : (selectedPeriod || 'lunch');
 
     // Log each plate item with its quantity
+    // Store per-serving nutrition values (not pre-multiplied by quantity)
     plate.forEach(({ item, quantity }) => {
       addMeal({
         name: item.name,
         mealType: logMealType,
-        calories: Math.round(item.calories * quantity),
-        protein: Math.round(item.protein_g * quantity),
-        carbs: Math.round(item.carbs_g * quantity),
-        fats: Math.round(item.fat_g * quantity),
+        calories: Math.round(item.calories),
+        protein: Math.round(item.protein_g),
+        carbs: Math.round(item.carbs_g),
+        fats: Math.round(item.fat_g),
         quantity,
       });
     });
