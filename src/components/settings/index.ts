@@ -8,3 +8,5 @@ export { AllergenSection, ALLERGEN_OPTIONS } from './AllergenSection';
 export type { AllergenId } from './AllergenSection';
 export { AllergenPickerModal } from './AllergenPickerModal';
 export { DislikesSection } from './DislikesSection';
+export { ItemManagementModal } from './ItemManagementModal';
+export type { ItemOption } from './ItemManagementModal';

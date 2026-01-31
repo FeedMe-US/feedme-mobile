@@ -410,7 +410,8 @@ function DailyView({ tracking, macroSplit, selectedVitamins }: { tracking: any; 
         </View>
       </Card>
 
-      {/* Key Vitamins Today */}
+      {/* Key Vitamins Today - HIDDEN FOR MVP: Will be re-enabled for premium subscription */}
+      {/*
       <Card variant="elevated" padding="lg" style={styles.vitaminCard}>
         <Text variant="h4" weight="semibold" style={styles.cardTitle}>
           Key Vitamins Today
@@ -433,6 +434,7 @@ function DailyView({ tracking, macroSplit, selectedVitamins }: { tracking: any; 
           </Text>
         )}
       </Card>
+      */}
     </>
   );
 }

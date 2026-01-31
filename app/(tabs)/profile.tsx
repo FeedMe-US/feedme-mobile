@@ -26,7 +26,7 @@ import { useIsAuthenticated } from '@/src/store/authStore';
 import { apiClient } from '@/src/services/api';
 import { userService } from '@/src/services/userService';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { AllergenSection, AllergenPickerModal, DislikesSection } from '@/src/components/settings';
+import { ItemManagementModal, ItemOption } from '@/src/components/settings/ItemManagementModal';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
@@ -52,8 +52,8 @@ export default function ProfileScreen() {
   const [showGoalTypePicker, setShowGoalTypePicker] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
-  const [dislikedFoodSearch, setDislikedFoodSearch] = useState('');
-  const [showDislikedFoodInput, setShowDislikedFoodInput] = useState(false);
+  const [showAllergenModal, setShowAllergenModal] = useState(false);
+  const [showDislikedFoodModal, setShowDislikedFoodModal] = useState(false);
   const [editingMacro, setEditingMacro] = useState<string | null>(null);
   const [macroEditValue, setMacroEditValue] = useState('');
   const [useCustomTargets, setUseCustomTargets] = useState(false); // When true, skip auto-calculation
@@ -61,6 +61,34 @@ export default function ProfileScreen() {
   const [proteinLocked, setProteinLocked] = useState(true); // Protein auto-calculates by default
 
   const dietaryRestrictions = ['Vegetarian', 'Vegan', 'Pescatarian', 'Halal', 'Kosher', 'Gluten-free', 'None'];
+
+  // Allergen options from onboarding (matching allergies.tsx)
+  const allergenOptions: ItemOption[] = [
+    { id: 'peanuts', name: 'Peanuts' },
+    { id: 'tree-nuts', name: 'Tree Nuts' },
+    { id: 'dairy', name: 'Dairy' },
+    { id: 'gluten', name: 'Gluten' },
+    { id: 'shellfish', name: 'Shellfish' },
+    { id: 'soy', name: 'Soy' },
+    { id: 'eggs', name: 'Eggs' },
+    { id: 'fish', name: 'Fish' },
+    { id: 'beef', name: 'Beef' },
+    { id: 'pork', name: 'Pork' },
+  ];
+
+  // Disliked food options from onboarding (matching ingredients-avoid.tsx)
+  const dislikedFoodOptions = [
+    'Mushrooms',
+    'Cilantro',
+    'Olives',
+    'Spicy Food',
+    'Mayonnaise',
+    'Onions',
+    'Pickles',
+    'Blue Cheese',
+    'Anchovies',
+    'Tomatoes',
+  ];
 
   // Mapping between display names and backend keys for micronutrients
   const vitaminDisplayToKey: Record<string, string> = {
@@ -105,12 +133,19 @@ export default function ProfileScreen() {
   const goalTypes = ['Cut', 'Maintain', 'Lean Muscle Growth', 'Bulk'];
 
   const [selectedRestrictions, setSelectedRestrictions] = useState<string[]>([]);
-  const [allergenExclusions, setAllergenExclusions] = useState<string[]>([]); // Safety - hard filter
-  const [dislikedFoods, setDislikedFoods] = useState<string[]>([]); // Preference - soft filter
-  const [showAllergenPicker, setShowAllergenPicker] = useState(false);
+  const [allergenExclusions, setAllergenExclusions] = useState<string[]>([]); // Safety - hard filter (stored as IDs from onboarding)
+  const [dislikedFoods, setDislikedFoods] = useState<string[]>([]); // Preference - soft filter (stored as display names)
   const [selectedHalls, setSelectedHalls] = useState<string[]>(['BPlate', 'De Neve Dining']);
   const [selectedVitamins, setSelectedVitamins] = useState<string[]>(['Vitamin D', 'Vitamin B12', 'Iron']);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Get custom allergens (not in standard list)
+  const customAllergens = (allergenExclusions || []).filter(
+    id => !allergenOptions.find(opt => opt.id === id)
+  );
+
+  // Get custom disliked foods (not in standard list)
+  const customDislikedFoods = (dislikedFoods || []).filter(f => !dislikedFoodOptions.includes(f));
 
   // Notification reminder times (when notifications fire)
   const [reminderTimes, setReminderTimes] = useState<{
@@ -259,7 +294,8 @@ export default function ProfileScreen() {
             if (profile.allergen_exclusions?.length) {
               setAllergenExclusions(profile.allergen_exclusions);
             }
-            // TODO: Load disliked foods from user_food_preferences when endpoint is available
+            // Load disliked foods from onboarding data (ingredientsAvoid)
+            // Backend doesn't have a separate endpoint yet, so we use local data
             if (profile.preferred_locations?.length) {
               const mappedHalls = profile.preferred_locations
                 .map(id => locationIdToName[id])
@@ -325,6 +361,11 @@ export default function ProfileScreen() {
         if (data.dietaryRequirements?.length) {
           setSelectedRestrictions(data.dietaryRequirements);
         }
+        // Load allergens from onboarding (stored as IDs like 'peanuts', 'tree-nuts', etc.)
+        if (data.allergies?.length) {
+          setAllergenExclusions(data.allergies);
+        }
+        // Load disliked foods from onboarding (stored as display names)
         if (data.ingredientsAvoid?.length) {
           setDislikedFoods(data.ingredientsAvoid);
         }
@@ -488,6 +529,39 @@ export default function ProfileScreen() {
 
     saveVitamins();
   }, [selectedVitamins, isInitialLoad, isAuthenticated]);
+
+  // Save allergens when they change - sync to backend and local storage
+  React.useEffect(() => {
+    if (isInitialLoad) return;
+
+    const saveAllergens = async () => {
+      // Save to local onboarding data (as IDs)
+      await saveOnboardingData({ allergies: allergenExclusions });
+
+      // Sync to backend if authenticated
+      if (isAuthenticated && allergenExclusions.length >= 0) {
+        try {
+          await userService.updateProfile({ allergen_exclusions: allergenExclusions });
+        } catch (error) {
+          console.warn('[profile] Failed to sync allergens to backend:', error);
+        }
+      }
+    };
+
+    saveAllergens();
+  }, [allergenExclusions, isInitialLoad, isAuthenticated]);
+
+  // Save disliked foods when they change - sync to local storage
+  React.useEffect(() => {
+    if (isInitialLoad) return;
+
+    const saveDislikedFoods = async () => {
+      // Save to local onboarding data (backend endpoint not available yet)
+      await saveOnboardingData({ ingredientsAvoid: dislikedFoods });
+    };
+
+    saveDislikedFoods();
+  }, [dislikedFoods, isInitialLoad]);
 
   const toggleSelection = (
     item: string,
@@ -783,14 +857,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleAddDislikedFood = () => {
-    if (dislikedFoodSearch.trim() && !dislikedFoods.includes(dislikedFoodSearch.trim())) {
-      haptics.success();
-      setDislikedFoods([...dislikedFoods, dislikedFoodSearch.trim()]);
-      setDislikedFoodSearch('');
-      setShowDislikedFoodInput(false);
-    }
-  };
 
   const handleRemoveDislikedFood = (food: string) => {
     haptics.light();
@@ -1340,7 +1406,8 @@ export default function ProfileScreen() {
           )}
         </Card>
 
-        {/* Key Vitamins to Track - Swipeable with plus */}
+        {/* Key Vitamins to Track - HIDDEN FOR MVP: Will be re-enabled for premium subscription */}
+        {/*
         <Card variant="elevated" padding="lg" style={styles.card}>
           <View style={styles.vitaminHeader}>
             <View>
@@ -1379,6 +1446,7 @@ export default function ProfileScreen() {
             </ScrollView>
           </View>
         </Card>
+        */}
 
         {/* Dietary Restrictions */}
         <Card variant="elevated" padding="lg" style={styles.card}>
@@ -1405,53 +1473,91 @@ export default function ProfileScreen() {
           </View>
         </Card>
 
-        {/* Dietary Settings - Allergens & Dislikes (per §3.1 of BEHAVIORAL_CONTRACT.md) */}
+        {/* Allergies - Safety (hard filter) */}
         <Card variant="elevated" padding="lg" style={styles.card}>
-          <Text variant="h4" weight="semibold" style={styles.sectionTitle}>
-            Dietary Settings
-          </Text>
+          <View style={styles.vitaminHeader}>
+            <Text variant="h4" weight="semibold" style={styles.sectionTitle}>
+              Allergies
+            </Text>
+            <TouchableOpacity
+              style={[styles.plusButton, { backgroundColor: themeColors.primary + '30' }]}
+              onPress={() => {
+                haptics.medium();
+                setShowAllergenModal(true);
+              }}>
+              <Text style={[styles.plusIcon, { color: themeColors.primary }]}>+</Text>
+            </TouchableOpacity>
+          </View>
 
-          {/* Allergen Exclusions - Safety (hard filter) */}
-          <AllergenSection
-            selectedAllergens={allergenExclusions}
-            onPressAddAllergen={() => setShowAllergenPicker(true)}
-            onRemoveAllergen={(id) => {
-              const newAllergens = allergenExclusions.filter((a) => a !== id);
-              setAllergenExclusions(newAllergens);
-              // Sync to backend
-              userService.updateProfile({ allergen_exclusions: newAllergens }).catch(console.error);
-            }}
-          />
-
-          <View style={styles.sectionDivider} />
-
-          {/* Disliked Foods - Preference (soft filter) */}
-          <DislikesSection
-            dislikedFoods={dislikedFoods}
-            onAddDislike={(food) => {
-              if (!dislikedFoods.includes(food)) {
-                setDislikedFoods([...dislikedFoods, food]);
-                // TODO: Sync to backend via preference endpoint when available
-              }
-            }}
-            onRemoveDislike={(food) => {
-              setDislikedFoods(dislikedFoods.filter((f) => f !== food));
-              // TODO: Sync to backend via preference endpoint when available
-            }}
-          />
+          <View style={styles.scrollViewContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsContainer}>
+              {/* Show standard allergen options */}
+              {allergenOptions.map((allergen) => (
+                <Chip
+                  key={allergen.id}
+                  label={allergen.name}
+                  selected={allergenExclusions.includes(allergen.id)}
+                  onPress={() => {
+                    toggleSelection(allergen.id, allergenExclusions, setAllergenExclusions);
+                  }}
+                  style={styles.chip}
+                />
+              ))}
+              {/* Show custom allergens from onboarding (not in standard list) */}
+              {customAllergens.map((customAllergen) => (
+                <Chip
+                  key={customAllergen}
+                  label={customAllergen}
+                  selected={true}
+                  onPress={() => {
+                    toggleSelection(customAllergen, allergenExclusions, setAllergenExclusions);
+                  }}
+                  style={styles.chip}
+                />
+              ))}
+            </ScrollView>
+          </View>
         </Card>
 
-        {/* Allergen Picker Modal */}
-        <AllergenPickerModal
-          visible={showAllergenPicker}
-          onClose={() => setShowAllergenPicker(false)}
-          selectedAllergens={allergenExclusions}
-          onSave={(newAllergens) => {
-            setAllergenExclusions(newAllergens);
-            // Sync to backend
-            userService.updateProfile({ allergen_exclusions: newAllergens }).catch(console.error);
-          }}
-        />
+        {/* Disliked Foods - Preference (soft filter) */}
+        <Card variant="elevated" padding="lg" style={styles.card}>
+          <View style={styles.vitaminHeader}>
+            <Text variant="h4" weight="semibold" style={styles.sectionTitle}>
+              Disliked Foods
+            </Text>
+            <TouchableOpacity
+              style={[styles.plusButton, { backgroundColor: themeColors.primary + '30' }]}
+              onPress={() => {
+                haptics.medium();
+                setShowDislikedFoodModal(true);
+              }}>
+              <Text style={[styles.plusIcon, { color: themeColors.primary }]}>+</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.scrollViewContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsContainer}>
+              {/* Show all available options plus any custom ones from onboarding */}
+              {[...dislikedFoodOptions, ...customDislikedFoods].map((food) => (
+                <Chip
+                  key={food}
+                  label={food}
+                  selected={dislikedFoods.includes(food)}
+                  onPress={() => {
+                    toggleSelection(food, dislikedFoods, setDislikedFoods);
+                  }}
+                  style={styles.chip}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        </Card>
 
         {/* Dining Hall Preferences */}
         <Card variant="elevated" padding="lg" style={styles.card}>
@@ -1901,6 +2007,42 @@ export default function ProfileScreen() {
           onChange={handleReminderTimeChange}
         />
       )}
+
+      {/* Allergen Management Modal */}
+      <ItemManagementModal
+        visible={showAllergenModal}
+        onClose={() => setShowAllergenModal(false)}
+        title="Allergies"
+        subtitle="Foods we'll never recommend for your safety"
+        selectedItems={allergenExclusions}
+        standardOptions={allergenOptions}
+        customItems={customAllergens}
+        onSave={(selectedItems, updatedCustomItems) => {
+          // Merge standard selections with custom items
+          const standardIds = selectedItems.filter(id => allergenOptions.find(opt => opt.id === id));
+          const customIds = selectedItems.filter(id => !allergenOptions.find(opt => opt.id === id));
+          setAllergenExclusions([...standardIds, ...customIds]);
+        }}
+        placeholder="Search or add custom allergy..."
+        addButtonLabel="Add"
+      />
+
+      {/* Disliked Foods Management Modal */}
+      <ItemManagementModal
+        visible={showDislikedFoodModal}
+        onClose={() => setShowDislikedFoodModal(false)}
+        title="Disliked Foods"
+        subtitle="Foods you'd rather skip (we'll deprioritize these)"
+        selectedItems={dislikedFoods}
+        standardOptions={dislikedFoodOptions.map(food => ({ id: food, name: food }))}
+        customItems={customDislikedFoods}
+        onSave={(selectedItems, updatedCustomItems) => {
+          setDislikedFoods(selectedItems);
+        }}
+        placeholder="Search or add disliked food..."
+        addButtonLabel="Add"
+        isDislikedFoods={true}
+      />
     </Screen>
   );
 }
@@ -2363,6 +2505,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'transparent',
     width: '100%',
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    alignItems: 'center',
+  },
+  searchInput: {
+    flex: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    fontSize: 16,
+    minHeight: 44,
+  },
+  addButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 44,
+    minWidth: 60,
+  },
+  cancelButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 44,
   },
 });
 

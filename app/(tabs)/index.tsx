@@ -635,7 +635,8 @@ useFocusEffect(
             </View>
           </View>
 
-          {/* Micronutrient Progress - only show selected vitamins with real data */}
+          {/* Micronutrient Progress - HIDDEN FOR MVP: Will be re-enabled for premium subscription */}
+          {/* 
           {(() => {
             // Filter to only show selected vitamins that have data
             const filteredNutrients = tracking.micronutrients.filter(
@@ -685,6 +686,7 @@ useFocusEffect(
               </View>
             );
           })()}
+          */}
         </Card>
 
         {/* Dining Hall Selector */}
@@ -795,42 +797,8 @@ useFocusEffect(
           </Card>
         )}
 
-        {/* Meal Period Selector - always show when Any Hill/Campus is selected or specific hall is selected */}
-        {(selectedHallSlug || selectedHallMode !== 'specific') && (
-          <View style={styles.mealPeriodSection}>
-            <View style={styles.sectionLabel}>
-              <Text variant="h4" weight="semibold">
-                Meal Period
-              </Text>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={[styles.mealPeriodChips, { paddingLeft: spacing.lg, paddingRight: spacing.lg }]}>
-              {getAvailablePeriods().map((period) => {
-                const periodLabels: Record<MealPeriod, string> = {
-                  breakfast: 'Breakfast',
-                  lunch: 'Lunch',
-                  dinner: 'Dinner',
-                  late_night: 'Late Night',
-                };
-                return (
-                  <Chip
-                    key={period}
-                    label={periodLabels[period]}
-                    selected={selectedMealPeriod === period}
-                    onPress={() => {
-                      haptics.selection();
-                      setSelectedMealPeriod(period);
-                      // Auto-generate will happen via useEffect
-                    }}
-                    style={styles.mealPeriodChip}
-                  />
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
+        {/* Meal Period Selector - REMOVED: App automatically determines meal period based on time of day */}
+        {/* The meal period is automatically set via getCurrentMealPeriod() and used by the API */}
 
         {/* Recommended Meal Card - show loading state or meal card */}
         {isGenerating && !recommendedMeal ? (
