@@ -39,7 +39,6 @@ export interface MealCardProps {
   protein: number;
   carbs: number;
   fat: number;
-  onLogAll?: () => void;
   onSelectItems?: () => void;
   onSwipeLeft?: () => void;
   onSwipeRight?: () => void;
@@ -59,7 +58,6 @@ export function MealCard({
   protein,
   carbs,
   fat,
-  onLogAll,
   onSelectItems,
   onSwipeLeft,
   onSwipeRight,
@@ -91,34 +89,16 @@ export function MealCard({
     }
   };
 
-  const handleLogAll = () => {
-    if (!onLogAll) return;
-    
-    // Set logged state and trigger animation
-    setIsLogged(true);
-    haptics.success();
-    
-    // Single bounce animation - scale up then back down smoothly
-    scaleAnim.value = withTiming(1.15, { duration: 150 }, () => {
-      scaleAnim.value = withTiming(1, { duration: 200 });
-    });
-    
-    // Call the actual log handler
-    onLogAll();
-    
-    // Reset after animation completes
-    setTimeout(() => {
-      setIsLogged(false);
-    }, 2000);
-  };
 
   // Handle swipe left - simple and safe like menu
   const handleSwipeLeft = () => {
     if (isSwipingRef.current || !onSwipeLeft) return;
     isSwipingRef.current = true;
     
-    // Trigger visual feedback for logging
+    // Set logged state and trigger animation
     setIsLogged(true);
+    
+    // Single bounce animation - scale up then back down smoothly
     scaleAnim.value = withTiming(1.15, { duration: 150 }, () => {
       scaleAnim.value = withTiming(1, { duration: 200 });
     });
@@ -128,7 +108,7 @@ export function MealCard({
       isSwipingRef.current = false;
     }, 500);
     
-    // Reset visual feedback after animation
+    // Reset after animation completes
     setTimeout(() => {
       setIsLogged(false);
     }, 2000);
@@ -352,17 +332,18 @@ export function MealCard({
                 </View>
               </View>
 
-              {/* Actions - Polished buttons with icons */}
+              {/* Actions - Centered Select Items button */}
               <View style={styles.actions}>
-                <Animated.View style={[styles.logAllButtonWrapper, logButtonAnimatedStyle]}>
+                <Animated.View style={[styles.selectItemsButtonWrapper, logButtonAnimatedStyle]}>
                   <TouchableOpacity
                     style={[
-                      styles.logAllButtonInner,
+                      styles.selectItemsButtonInner,
                       { 
-                        backgroundColor: isLogged ? themeColors.success : themeColors.primary 
+                        backgroundColor: isLogged ? themeColors.success : 'transparent',
+                        borderColor: isLogged ? themeColors.success : themeColors.primary,
                       },
-                      colorScheme === 'dark' && {
-                        shadowColor: isLogged ? themeColors.success : '#0a7ea4',
+                      colorScheme === 'dark' && isLogged && {
+                        shadowColor: themeColors.success,
                         shadowOffset: { width: 0, height: 0 },
                         shadowOpacity: 0.15,
                         shadowRadius: 10,
@@ -371,32 +352,30 @@ export function MealCard({
                         }),
                       },
                     ]}
-                    onPress={handleLogAll}
+                    onPress={onSelectItems}
                     activeOpacity={0.8}
                     disabled={isLogged}>
-                    <View style={styles.buttonIcon}>
+                    <View style={[
+                      styles.buttonIcon,
+                      !isLogged ? {
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        borderColor: themeColors.primary,
+                      } : {
+                        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                      }
+                    ]}>
                       <AppIcon 
-                        type={isLogged ? "check" : "plus"} 
+                        type="check" 
                         size={16} 
-                        color={themeColors.textInverse} 
+                        color={isLogged ? themeColors.textInverse : themeColors.primary} 
                       />
                     </View>
-                    <Text variant="body" weight="semibold" style={{ color: themeColors.textInverse }}>
-                      {isLogged ? "Logged!" : "Log All"}
+                    <Text variant="body" weight="semibold" style={{ color: isLogged ? themeColors.textInverse : themeColors.text }}>
+                      {isLogged ? "Logged!" : "Select Items"}
                     </Text>
                   </TouchableOpacity>
                 </Animated.View>
-                <TouchableOpacity
-                  style={[styles.selectItemsButton, { borderColor: themeColors.primary }]}
-                  onPress={onSelectItems}
-                  activeOpacity={0.8}>
-                  <View style={[styles.buttonIcon, { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: themeColors.primary }]}>
-                    <AppIcon type="check" size={16} color={themeColors.primary} />
-                  </View>
-                  <Text variant="body" weight="semibold" style={{ color: themeColors.text }}>
-                    Select Items
-                  </Text>
-                </TouchableOpacity>
               </View>
             </>
           )}
@@ -490,23 +469,14 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  logAllButtonWrapper: {
-    flex: 1,
-  },
-  logAllButtonInner: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.lg,
-    gap: spacing.sm,
+    alignItems: 'center',
   },
-  selectItemsButton: {
+  selectItemsButtonWrapper: {
     flex: 1,
+    maxWidth: '100%',
+  },
+  selectItemsButtonInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -514,7 +484,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: radius.lg,
     borderWidth: 1.5,
-    backgroundColor: 'transparent',
     gap: spacing.sm,
   },
   buttonIcon: {

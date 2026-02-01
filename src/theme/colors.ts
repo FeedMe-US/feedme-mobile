@@ -47,7 +47,7 @@ export const colors = {
     calories: '#EF4444',
     protein: '#22C55E', // Green from screenshots
     carbs: '#A78BFA', // Purple from screenshots
-    fats: '#F87171', // Pink from screenshots
+    fats: '#FCD34D', // Pastel yellow
     
     // Interactive states
     overlay: 'rgba(0, 0, 0, 0.5)',
@@ -98,7 +98,7 @@ export const colors = {
     calories: '#EF4444',
     protein: '#22C55E', // Green
     carbs: '#A78BFA', // Purple
-    fats: '#F87171', // Pink
+    fats: '#FCD34D', // Pastel yellow
     
     // Interactive states
     overlay: 'rgba(0, 0, 0, 0.8)',

@@ -34,7 +34,7 @@ export default function ProgressScreen() {
   const themeColors = colors[colorScheme ?? 'light']; // Default to light for Neumorphism
   const { tracking } = useDailyTracking();
   const [period, setPeriod] = useState<TimePeriod>('weekly');
-  const [metric, setMetric] = useState<MetricType>('protein');
+  const [metric, setMetric] = useState<MetricType>('calories');
   const [isLoading, setIsLoading] = useState(false);
   const [weeklyData, setWeeklyData] = useState<WeeklyStats[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyStats[]>([]);
@@ -250,10 +250,8 @@ export default function ProgressScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.metricSelector}>
             {([
-              { label: 'Protein', value: 'protein' },
               { label: 'Calories', value: 'calories' },
-              { label: 'Weight', value: 'weight' },
-              { label: 'Consistency', value: 'consistency' },
+              { label: 'Protein', value: 'protein' },
             ] as Array<{ label: string; value: MetricType }>).map((m) => (
               <TouchableOpacity
                 key={m.value}
@@ -370,40 +368,56 @@ function DailyView({ tracking, macroSplit, selectedVitamins }: { tracking: any; 
             strokeWidth={24}
             color={themeColors.calories}
             unit="kcal today"
+            isExceeded={tracking.consumed.calories > tracking.targets.calories}
           />
         </View>
 
-        <View style={styles.macroBreakdown}>
-          <View style={styles.macroItem}>
-            <Text
-              variant="body"
-              weight="semibold"
-              style={{ color: themeColors.protein }}>
-              {tracking.consumed.protein} g
-            </Text>
-            <Text variant="caption" color="secondary">
+        {/* Dividing line */}
+        <View style={styles.macroDivider} />
+
+        <View style={styles.macroRingsRow}>
+          <View style={styles.macroRingWrapper}>
+            <MacroRing
+              value={tracking.consumed.protein}
+              max={tracking.targets.protein}
+              size={90}
+              strokeWidth={10}
+              color={themeColors.protein}
+              unit="g"
+              isExceeded={tracking.consumed.protein > tracking.targets.protein}
+              isSmall={true}
+            />
+            <Text variant="caption" color="secondary" style={styles.macroLabel}>
               Protein
             </Text>
           </View>
-          <View style={styles.macroItem}>
-            <Text
-              variant="body"
-              weight="semibold"
-              style={{ color: themeColors.carbs }}>
-              {tracking.consumed.carbs} g
-            </Text>
-            <Text variant="caption" color="secondary">
+          <View style={styles.macroRingWrapper}>
+            <MacroRing
+              value={tracking.consumed.carbs}
+              max={tracking.targets.carbs}
+              size={90}
+              strokeWidth={10}
+              color={themeColors.carbs}
+              unit="g"
+              isExceeded={tracking.consumed.carbs > tracking.targets.carbs}
+              isSmall={true}
+            />
+            <Text variant="caption" color="secondary" style={styles.macroLabel}>
               Carbs
             </Text>
           </View>
-          <View style={styles.macroItem}>
-            <Text
-              variant="body"
-              weight="semibold"
-              style={{ color: themeColors.fats }}>
-              {tracking.consumed.fats} g
-            </Text>
-            <Text variant="caption" color="secondary">
+          <View style={styles.macroRingWrapper}>
+            <MacroRing
+              value={tracking.consumed.fats}
+              max={tracking.targets.fats}
+              size={90}
+              strokeWidth={10}
+              color={themeColors.fats}
+              unit="g"
+              isExceeded={tracking.consumed.fats > tracking.targets.fats}
+              isSmall={true}
+            />
+            <Text variant="caption" color="secondary" style={styles.macroLabel}>
               Fat
             </Text>
           </View>
@@ -833,6 +847,28 @@ const styles = StyleSheet.create({
   ringContainer: {
     alignItems: 'center',
     marginVertical: spacing.lg,
+  },
+  macroDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+    marginHorizontal: spacing.lg,
+  },
+  macroRingsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.md,
+  },
+  macroRingWrapper: {
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0, // Prevents overflow
+  },
+  macroLabel: {
+    marginTop: spacing.sm,
   },
   macroBreakdown: {
     flexDirection: 'row',

@@ -829,7 +829,6 @@ useFocusEffect(
             protein={recommendedMeal.protein}
             carbs={recommendedMeal.carbs}
             fat={recommendedMeal.fat}
-            onLogAll={handleLogAll}
             onSelectItems={() => {
               haptics.medium();
               router.push({
