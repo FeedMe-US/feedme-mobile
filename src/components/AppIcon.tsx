@@ -26,7 +26,8 @@ export type AppIconType =
   | 'home'
   | 'progress'
   | 'warning'
-  | 'back';
+  | 'back'
+  | 'location';
 
 export interface AppIconProps {
   type: AppIconType;
@@ -53,6 +54,7 @@ const ICON_MAP: Record<AppIconType, MaterialIconName> = {
   'progress': 'trending-up', // Updated to trending-up
   'warning': 'warning', // Warning/alert icon
   'back': 'arrow-back', // Back arrow icon
+  'location': 'place', // Location pin icon
 };
 
 export function AppIcon({ type, size = 20, color, filled }: AppIconProps) {

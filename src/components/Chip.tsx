@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
+import { TouchableOpacity, StyleSheet, ViewStyle, View } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors, spacing, radius, typography } from '@/src/theme';
 import { Text } from '@/src/ui/Text';
@@ -14,9 +14,10 @@ export interface ChipProps {
   selected?: boolean;
   onPress?: () => void;
   style?: ViewStyle;
+  icon?: React.ReactNode;
 }
 
-export function Chip({ label, selected = false, onPress, style }: ChipProps) {
+export function Chip({ label, selected = false, onPress, style, icon }: ChipProps) {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light']; // Default to light for Neumorphism
 
@@ -43,14 +44,17 @@ export function Chip({ label, selected = false, onPress, style }: ChipProps) {
       onPress={handlePress}
       activeOpacity={0.7}
       disabled={!onPress}>
-      <Text
-        variant="bodySmall"
-        weight={selected ? 'semibold' : 'medium'}
-        style={{
-          color: selected ? themeColors.primary : themeColors.text,
-        }}>
-        {label}
-      </Text>
+      <View style={styles.chipContent}>
+        {icon && <View style={styles.iconContainer}>{icon}</View>}
+        <Text
+          variant="bodySmall"
+          weight={selected ? 'semibold' : 'medium'}
+          style={{
+            color: selected ? themeColors.primary : themeColors.text,
+          }}>
+          {label}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -61,6 +65,16 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
     borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },

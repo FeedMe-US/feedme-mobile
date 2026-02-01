@@ -7,6 +7,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Chip } from '@/src/components/Chip';
 import { MacroRing } from '@/src/components/MacroRing';
 import { MealCard } from '@/src/components/MealCard';
+import { AppIcon } from '@/src/components/AppIcon';
 import { locationService } from '@/src/services/locationService';
 import { MealRecommendation, mealService, MealPeriod } from '@/src/services/mealService';
 import { useDailyTracking } from '@/src/store/DailyTrackingContext';
@@ -37,6 +38,7 @@ export default function HomeScreen() {
   const [selectedHallMode, setSelectedHallMode] = useState<'specific' | 'hill' | 'campus'>('hill');
   const [diningHalls, setDiningHalls] = useState<string[]>([]);
   const [diningHallsData, setDiningHallsData] = useState<Map<string, { isOpen: boolean; availablePeriods?: string[] }>>(new Map());
+  const [closestHallSlug, setClosestHallSlug] = useState<string | null>(null);
 
   // Meal period and mood selection
   const [selectedMealPeriod, setSelectedMealPeriod] = useState<MealPeriod | null>(null);
@@ -277,6 +279,9 @@ useFocusEffect(
   useCallback(() => {
     const loadDiningHalls = async () => {
     try {
+      // Get user location for finding closest hall
+      const userLocation = await locationService.getCurrentLocation();
+      
       // Get all dining halls from the API
       const allHalls = await mealService.getDiningHalls();
       console.log('[Home] Loaded', allHalls.length, 'dining halls from API');
@@ -408,8 +413,29 @@ useFocusEffect(
         return a.name.localeCompare(b.name);
       });
 
+      // Find closest hall if user location is available
+      let closestSlug: string | null = null;
+      if (userLocation) {
+        const sortedByDistance = await mealService.getDiningHallsSorted(
+          userLocation.latitude,
+          userLocation.longitude,
+          preferredSlugs
+        );
+        // Get the closest hall that's in our preferred halls list
+        const closestHall = sortedByDistance.find(hall => 
+          preferredHalls.some(ph => ph.slug === hall.slug)
+        );
+        if (closestHall) {
+          closestSlug = closestHall.slug;
+        }
+      }
+
       // Get slugs for all halls to show (deduplicated to ensure unique React keys)
-      const hallSlugs = Array.from(new Set(sortedHalls.map(h => h.slug)));
+      // Put closest hall first if found
+      let hallSlugs = Array.from(new Set(sortedHalls.map(h => h.slug)));
+      if (closestSlug && hallSlugs.includes(closestSlug)) {
+        hallSlugs = [closestSlug, ...hallSlugs.filter(slug => slug !== closestSlug)];
+      }
 
       // Store open/closed status and available periods for each hall (use merged data)
       const hallsDataMap = new Map<string, { isOpen: boolean; availablePeriods?: string[] }>();
@@ -422,6 +448,7 @@ useFocusEffect(
       setDiningHallsData(hallsDataMap);
 
       setDiningHalls(hallSlugs);
+      setClosestHallSlug(closestSlug);
       // Don't auto-select a hall - user must explicitly choose
     } catch (error) {
       console.error('Error loading dining halls:', error);
@@ -701,32 +728,7 @@ useFocusEffect(
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={[styles.diningHallChips, { paddingLeft: spacing.lg, paddingRight: spacing.lg }]}>
-              {/* Special mode chips first */}
-              <Chip
-                key="any-hill"
-                label="Dining Halls"
-                selected={selectedHallMode === 'hill'}
-                onPress={() => {
-                  haptics.light();
-                  setSelectedHallMode('hill');
-                  setSelectedHallSlug(null);
-                  // Auto-generate will happen via useEffect
-                }}
-                style={styles.diningHallChip}
-              />
-              <Chip
-                key="any-campus"
-                label="Campus Spots"
-                selected={selectedHallMode === 'campus'}
-                onPress={() => {
-                  haptics.light();
-                  setSelectedHallMode('campus');
-                  setSelectedHallSlug(null);
-                  // Auto-generate will happen via useEffect
-                }}
-                style={styles.diningHallChip}
-              />
-              {/* Regular hall chips */}
+              {/* Regular hall chips - closest hall first with location icon */}
               {diningHalls.map((hallSlug) => {
                 // Map slugs to proper display names
               const hallNameMap: Record<string, string> = {
@@ -769,6 +771,7 @@ useFocusEffect(
                 const chipStyle = !isOpen
                   ? { ...styles.diningHallChip, opacity: 0.6 }
                   : styles.diningHallChip;
+                const isClosest = closestHallSlug === hallSlug;
                 return (
                   <Chip
                     key={hallSlug}
@@ -781,6 +784,9 @@ useFocusEffect(
                       // Auto-generate will happen via useEffect
                     }}
                     style={chipStyle}
+                    icon={isClosest ? (
+                      <AppIcon type="location" size={16} color={themeColors.primary} />
+                    ) : undefined}
                   />
                 );
               })}
