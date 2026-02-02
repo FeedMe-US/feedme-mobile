@@ -91,7 +91,7 @@ export default function MealTimesScreen() {
       dinner: mealTimes.find(m => m.type === 'dinner')?.time ? formatTime(mealTimes.find(m => m.type === 'dinner')?.time || null) : undefined,
     };
     await saveOnboardingData({ mealTimes: mealTimesData });
-    router.push('/(onboarding)/complete');
+    router.push('/(onboarding)/taste-profile');
   };
 
   return (

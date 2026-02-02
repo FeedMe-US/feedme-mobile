@@ -19,14 +19,12 @@ export default function OnboardingLayout() {
       <Stack.Screen name="allergies" />
       <Stack.Screen name="ingredients-avoid" />
       <Stack.Screen name="meal-times" />
+      <Stack.Screen name="taste-profile" />
       {/* Reminders screen temporarily removed from flow - code kept in reminders.tsx */}
       {/* <Stack.Screen name="reminders" /> */}
-      {/* Swipe seed screen removed from flow - code kept in swipe-seed.tsx */}
-      {/* <Stack.Screen name="swipe-seed" /> */}
       {/* Meals per day screen removed from flow - code kept in meals-per-day.tsx */}
       {/* <Stack.Screen name="meals-per-day" /> */}
       <Stack.Screen name="complete" />
     </Stack>
   );
 }
-
