@@ -109,6 +109,11 @@ export type UserProfileUpdateRequestExtended = UserProfileUpdateRequest & {
   tracked_micronutrients?: string[];
 };
 
+/** Extended profile response including micronutrient tracking (pending OpenAPI regeneration) */
+export type UserProfileResponseExtended = UserProfileResponse & {
+  tracked_micronutrients?: string[];
+};
+
 // === Preference Types ===
 export type ThumbsUpRequest = Schemas['ThumbsUpRequest'];
 export type ThumbsUpResponse = Schemas['ThumbsUpResponse'];

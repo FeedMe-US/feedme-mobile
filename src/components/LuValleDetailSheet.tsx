@@ -340,34 +340,27 @@ export function LuValleDetailSheet({
                 <View style={styles.header}>
                   <View style={styles.handle} />
                   <View style={styles.headerContent}>
-                    <View style={styles.headerLeft}>
-                      <Text variant="h3" weight="bold" numberOfLines={1} style={styles.hallName}>
-                        LuValle Commons
-                      </Text>
-                      {(() => {
-                        const statusInfo = getGroupLocationStatus(locations);
-                        return (
-                          <View
-                            style={[
-                              styles.statusBadge,
-                              { backgroundColor: themeColors[statusInfo.colorKey] + '30' },
-                            ]}
+                    <Text variant="h3" weight="bold" numberOfLines={1} style={styles.hallName}>
+                      LuValle Commons
+                    </Text>
+                    {(() => {
+                      const statusInfo = getGroupLocationStatus(locations);
+                      return (
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            { backgroundColor: themeColors[statusInfo.colorKey] + '30' },
+                          ]}
+                        >
+                          <Text
+                            variant="caption"
+                            style={{ color: themeColors[statusInfo.colorKey] }}
                           >
-                            <Text
-                              variant="caption"
-                              style={{ color: themeColors[statusInfo.colorKey] }}
-                            >
-                              {statusInfo.label}
-                            </Text>
-                          </View>
-                        );
-                      })()}
-                    </View>
-                    <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                      <Text variant="h4" color="secondary">
-                        X
-                      </Text>
-                    </TouchableOpacity>
+                            {statusInfo.label}
+                          </Text>
+                        </View>
+                      );
+                    })()}
                   </View>
                 </View>
 
@@ -544,24 +537,16 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
     gap: spacing.sm,
   },
   hallName: {
     flex: 1,
+    flexShrink: 1,
   },
   statusBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs,
     borderRadius: radius.sm,
-  },
-  closeButton: {
-    padding: spacing.sm,
-    marginLeft: spacing.sm,
   },
   locationSelector: {
     paddingVertical: spacing.md,
