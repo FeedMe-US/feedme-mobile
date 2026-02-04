@@ -26,7 +26,6 @@ import { DiningHall, MenuItem, MenuSection, mealService } from '@/src/services/m
 import { MenuItemDetailModal } from './MenuItemDetailModal';
 import { useDailyTracking } from '@/src/store/DailyTrackingContext';
 import { haptics } from '@/src/utils/haptics';
-import { PlateIcon } from '@/src/components/icons';
 import {
   MealPeriod,
   getAvailableMealPeriods,
@@ -361,61 +360,29 @@ export function DiningHallDetailSheet({
                 <View style={styles.header}>
                   <View style={styles.handle} />
                   <View style={styles.headerContent}>
-                    <View style={styles.headerLeft}>
-                      <Text variant="h3" weight="bold" numberOfLines={1} style={styles.hallName}>
-                        {hall.name}
-                      </Text>
-                      {(() => {
-                        const statusInfo = getLocationStatus(hall);
-                        return (
-                          <View
-                            style={[
-                              styles.statusBadge,
-                              { backgroundColor: themeColors[statusInfo.colorKey] + '30' },
-                            ]}
+                    <Text variant="h3" weight="bold" numberOfLines={1} style={styles.hallName}>
+                      {hall.name}
+                    </Text>
+                    {(() => {
+                      const statusInfo = getLocationStatus(hall);
+                      return (
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            { backgroundColor: themeColors[statusInfo.colorKey] + '30' },
+                          ]}
+                        >
+                          <Text
+                            variant="caption"
+                            style={{ color: themeColors[statusInfo.colorKey] }}
                           >
-                            <Text
-                              variant="caption"
-                              style={{ color: themeColors[statusInfo.colorKey] }}
-                            >
-                              {statusInfo.label}
-                            </Text>
-                          </View>
-                        );
-                      })()}
-                    </View>
-                    <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                      <Text variant="h4" color="secondary">
-                        X
-                      </Text>
-                    </TouchableOpacity>
+                            {statusInfo.label}
+                          </Text>
+                        </View>
+                      );
+                    })()}
                   </View>
                 </View>
-
-                {/* AI Recommendation Button (shows when plate is empty) */}
-                {plate.length === 0 && !loading && sections.length > 0 && (
-                  <TouchableOpacity
-                    style={[
-                      styles.recommendButton,
-                      { backgroundColor: themeColors.primary },
-                      recommendLoading && { opacity: 0.7 },
-                    ]}
-                    onPress={handleGetRecommendation}
-                    disabled={recommendLoading}
-                    activeOpacity={0.8}
-                  >
-                    {recommendLoading ? (
-                      <ActivityIndicator size="small" color={themeColors.textInverse} />
-                    ) : (
-                      <View style={styles.buildPlateButtonContent}>
-                        <Text variant="body" weight="semibold" style={{ color: themeColors.textInverse }}>
-                          Build My Plate
-                        </Text>
-                        <PlateIcon size={22} color={themeColors.textInverse} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                )}
 
                 {/* Plate Display (shows when items added) */}
                 {plate.length > 0 && (
@@ -590,24 +557,16 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
     gap: spacing.sm,
   },
   hallName: {
     flex: 1,
+    flexShrink: 1,
   },
   statusBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xxs,
     borderRadius: radius.sm,
-  },
-  closeButton: {
-    padding: spacing.sm,
-    marginLeft: spacing.sm,
   },
   periodSelector: {
     paddingVertical: spacing.md,
@@ -728,19 +687,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: 'center',
     marginTop: spacing.xs,
-  },
-  recommendButton: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    paddingVertical: spacing.md,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  buildPlateButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
   },
 });
