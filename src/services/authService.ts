@@ -62,7 +62,7 @@ class AuthService {
       email,
       password,
       options: {
-        emailRedirectTo: 'feedme://auth/callback',
+        emailRedirectTo: 'ucnutrition://auth/callback',
       },
     });
 
@@ -132,7 +132,7 @@ class AuthService {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: 'feedme://auth/callback',
+        redirectTo: 'ucnutrition://auth/callback',
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
@@ -247,7 +247,7 @@ class AuthService {
    */
   async resetPassword(email: string): Promise<{ success: boolean; error?: string }> {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'feedme://auth/reset-password',
+      redirectTo: 'ucnutrition://auth/reset-password',
     });
 
     if (error) {
