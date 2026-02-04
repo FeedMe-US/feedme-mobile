@@ -38,6 +38,23 @@ export interface OnboardingData {
     differentOnWeekends?: boolean;
   };
 
+  // Taste & mood preferences
+  moodPreferences?: {
+    /** 0 (American Staples) → 4 (World Flavors) */
+    cuisine?: number;
+    /** 0 (Keep it mild) → 4 (Actually spicy) */
+    spice?: number;
+    /** 0 (Something light) → 4 (Hearty & Filling) */
+    heaviness?: number;
+    /** 0 (Stick to the regulars) → 4 (Try something new) */
+    adventurousness?: number;
+    /** 0 (Smooth & Soft) → 4 (Properly Crunchy) */
+    texture?: number;
+  };
+
+  // Diet strictness
+  dietStrictness?: 'strict' | 'balanced' | 'relaxed';
+
   // Custom macro targets
   useCustomTargets?: boolean; // If true, user has set custom macro values
   selectedVitamins?: string[]; // Vitamins to track in progress page
