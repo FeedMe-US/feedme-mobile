@@ -7,6 +7,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Chip } from '@/src/components/Chip';
 import { MacroRing } from '@/src/components/MacroRing';
 import { MealCard } from '@/src/components/MealCard';
+import { ClosedHallCard } from '@/src/components/ClosedHallCard';
 import { AppIcon } from '@/src/components/AppIcon';
 import { locationService } from '@/src/services/locationService';
 import { MealRecommendation, mealService, MealPeriod } from '@/src/services/mealService';
@@ -793,14 +794,13 @@ useFocusEffect(
             </ScrollView>
           </View>
         ) : (
-          <Card variant="elevated" padding="lg" style={styles.closedCard}>
-            <Text variant="h4" weight="semibold" style={styles.closedTitle}>
-              No dining Halls are Open
-            </Text>
-            <Text variant="body" color="secondary" style={styles.closedMessage}>
-              Swipe left to track off-campus nutrition
-            </Text>
-          </Card>
+          <ClosedHallCard
+            onSwipeRight={() => {
+              haptics.medium();
+              router.push('/manual-log');
+            }}
+            style={styles.closedCard}
+          />
         )}
 
         {/* Meal Period Selector - REMOVED: App automatically determines meal period based on time of day */}
@@ -818,14 +818,14 @@ useFocusEffect(
 
         {/* Recommended Meal Card or Closed Message */}
         {recommendedMeal && recommendedMeal.isClosed && (
-          <Card variant="elevated" padding="lg" style={styles.closedCard}>
-            <Text variant="h4" weight="semibold" style={styles.closedTitle}>
-              {recommendedMeal.diningHall} is closed
-            </Text>
-            <Text variant="body" color="secondary">
-              Check back during regular dining hours for meal recommendations
-            </Text>
-          </Card>
+          <ClosedHallCard
+            diningHallName={recommendedMeal.diningHall}
+            onSwipeRight={() => {
+              haptics.medium();
+              router.push('/manual-log');
+            }}
+            style={styles.closedCard}
+          />
         )}
         {recommendedMeal && !recommendedMeal.isClosed && (
           <MealCard
