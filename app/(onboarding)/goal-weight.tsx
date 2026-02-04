@@ -223,14 +223,6 @@ export default function GoalWeightScreen() {
                       },
                     ]}
                   />
-                  {isMainMarker && (
-                    <Text
-                      variant="caption"
-                      color="secondary"
-                      style={styles.markerLabel}>
-                      {weightOption}
-                    </Text>
-                  )}
                 </View>
               );
             })}

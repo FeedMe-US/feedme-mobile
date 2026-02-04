@@ -72,7 +72,7 @@ export default function AgeScreen() {
   return (
     <Screen>
       <View style={styles.container}>
-        {/* Back Button */}
+        {/* Back Button - Top Left */}
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -80,11 +80,13 @@ export default function AgeScreen() {
           <MaterialIcons name="arrow-back" size={24} color={themeColors.text} />
         </TouchableOpacity>
 
-        {/* Header */}
+        {/* Header with Title */}
         <View style={styles.header}>
-          <Text variant="h1" weight="bold" style={styles.title}>
-            How old are you?
-          </Text>
+          <View style={styles.titleContainer}>
+            <Text variant="h1" weight="bold" style={styles.title} numberOfLines={1}>
+              How old are you?
+            </Text>
+          </View>
         </View>
 
         {/* Scrollable Age Picker */}
@@ -177,24 +179,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
   },
+  header: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xl,
+    marginTop: spacing.xl,
+  },
   backButton: {
     position: 'absolute',
     top: spacing.xl,
     left: spacing.lg,
-    zIndex: 10,
     width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
   },
-  header: {
-    marginBottom: spacing.xl,
+  titleContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    width: '100%',
   },
   title: {
-    marginBottom: spacing.sm,
+    textAlign: 'center',
+    fontSize: 28,
+    flexShrink: 1,
   },
   pickerContainer: {
     flex: 1,

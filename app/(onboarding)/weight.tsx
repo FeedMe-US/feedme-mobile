@@ -158,14 +158,6 @@ export default function WeightScreen() {
                       },
                     ]}
                   />
-                  {isMainMarker && (
-                    <Text
-                      variant="caption"
-                      color="secondary"
-                      style={styles.markerLabel}>
-                      {weightOption}
-                    </Text>
-                  )}
                 </View>
               );
             })}
