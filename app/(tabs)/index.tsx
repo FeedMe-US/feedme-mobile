@@ -98,6 +98,58 @@ export default function HomeScreen() {
     if (!selectedMealPeriod) return;
     if (selectedHallMode === 'specific' && !selectedHallSlug) return;
 
+    // Check if the selected hall is closed (for specific mode)
+    if (selectedHallMode === 'specific' && selectedHallSlug) {
+      const hallData = diningHallsData.get(selectedHallSlug);
+      const isOpen = hallData?.isOpen ?? false;
+      
+      if (!isOpen) {
+        // Hall is closed - show closed message immediately
+        const hallNameMap: Record<string, string> = {
+          'bruin-plate': 'Bruin Plate',
+          'b-plate': 'BPlate',
+          'de-neve-dining': 'De Neve Dining',
+          'de-neve': 'De Neve Dining',
+          'epicuria-at-covel': 'Epicuria at Covel',
+          'epicuria': 'Epicuria at Covel',
+          'spice-kitchen': 'Feast',
+          'feast': 'Feast',
+          'rendezvous': 'Rendezvous',
+          'the-study-at-hedrick': 'The Study',
+          'the-study': 'The Study',
+          'the-drey': 'The Drey',
+          'bruin-cafe': 'Bruin Cafe',
+          'cafe-1919': 'Cafe 1919',
+          'epicuria-at-ackerman': 'Epicuria at Ackerman',
+          'anderson-cafe': 'Anderson Café',
+          'bombshelter': 'Court of Sciences: Bombshelter',
+          'luvalle-fusion': 'LuValle: Fusion',
+          'luvalle-pizza': 'LuValle: All Rise Pizza',
+          'luvalle-epazote': 'LuValle: Epazote',
+          'luvalle-burger': 'LuValle: Burger Assemble',
+          'luvalle-poke': 'LuValle: Northern Lights Poke',
+          'luvalle-panini': 'LuValle: Northern Lights Panini',
+          'synapse': 'Synapse',
+        };
+        const hallName = hallNameMap[selectedHallSlug] || selectedHallSlug
+          .split('-')
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        
+        setRecommendedMeal({
+          diningHall: hallName,
+          mealItems: [],
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          isClosed: true,
+        });
+        haptics.light();
+        return;
+      }
+    }
+
     setIsGenerating(true);
     try {
       const result = await mealService.getRecommendedMealWithOptions(
@@ -121,7 +173,7 @@ export default function HomeScreen() {
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedMealPeriod, selectedHallMode, selectedHallSlug, moodText, isInitialized]);
+  }, [selectedMealPeriod, selectedHallMode, selectedHallSlug, moodText, isInitialized, diningHallsData]);
 
   // Set greeting based on time
   useEffect(() => {
@@ -437,14 +489,30 @@ useFocusEffect(
         hallSlugs = [closestSlug, ...hallSlugs.filter(slug => slug !== closestSlug)];
       }
 
-      // Store open/closed status and available periods for each hall (use merged data)
+      // Store open/closed status and available periods for each hall
+      // Use preferredHalls (which includes fallbacks) to ensure all displayed halls are in the map
       const hallsDataMap = new Map<string, { isOpen: boolean; availablePeriods?: string[] }>();
+      
+      // First, populate from mergedHalls (has API data)
       mergedHalls.forEach(hall => {
         hallsDataMap.set(hall.slug, {
           isOpen: hall.is_open_now || false,
           availablePeriods: hall.available_periods || ['breakfast', 'lunch', 'dinner', 'late_night'],
         });
       });
+      
+      // Then, ensure all preferred halls (including fallbacks) are in the map
+      // This handles cases where a preferred hall wasn't in the API response
+      preferredHalls.forEach(hall => {
+        if (!hallsDataMap.has(hall.slug)) {
+          // Fallback hall not in API - use its is_open_now status (defaults to false)
+          hallsDataMap.set(hall.slug, {
+            isOpen: hall.is_open_now || false,
+            availablePeriods: hall.available_periods || ['breakfast', 'lunch', 'dinner', 'late_night'],
+          });
+        }
+      });
+      
       setDiningHallsData(hallsDataMap);
 
       setDiningHalls(hallSlugs);
@@ -767,7 +835,8 @@ useFocusEffect(
                   .join(' ');
                 // Remove "Closed" suffix if present
                 hallName = hallName.replace(/\s*\(?Closed\)?/gi, '').trim();
-                const isOpen = diningHallsData.get(hallSlug)?.isOpen ?? true;
+                // Get open status from diningHallsData - default to false (closed/dim) if not found
+                const isOpen = diningHallsData.get(hallSlug)?.isOpen ?? false;
                 const chipStyle = !isOpen
                   ? { ...styles.diningHallChip, opacity: 0.6 }
                   : styles.diningHallChip;
@@ -818,14 +887,15 @@ useFocusEffect(
 
         {/* Recommended Meal Card or Closed Message */}
         {recommendedMeal && recommendedMeal.isClosed && (
-          <Card variant="elevated" padding="lg" style={styles.closedCard}>
-            <Text variant="h4" weight="semibold" style={styles.closedTitle}>
-              {recommendedMeal.diningHall} is closed
-            </Text>
-            <Text variant="body" color="secondary">
-              Check back during regular dining hours for meal recommendations
-            </Text>
-          </Card>
+          <MealCard
+            diningHall={recommendedMeal.diningHall}
+            mealItems={[]}
+            calories={0}
+            protein={0}
+            carbs={0}
+            fat={0}
+            onSwipeRight={handleSwipeRight}
+          />
         )}
         {recommendedMeal && !recommendedMeal.isClosed && (
           <MealCard
