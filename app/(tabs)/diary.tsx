@@ -42,6 +42,7 @@ export default function DiaryScreen() {
   const [editQuantity, setEditQuantity] = useState<string>('');
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedMealIds, setSelectedMealIds] = useState<Set<string>>(new Set());
+  const [expandedSections, setExpandedSections] = useState<Set<MealType>>(new Set());
 
   const mealsByType: Record<MealType, LoggedMeal[]> = {
     breakfast: tracking.loggedMeals.filter((m) => m.mealType === 'breakfast'),
@@ -135,8 +136,23 @@ export default function DiaryScreen() {
     });
   };
 
+  const toggleSectionExpansion = (mealType: MealType) => {
+    const newExpanded = new Set(expandedSections);
+    if (newExpanded.has(mealType)) {
+      newExpanded.delete(mealType);
+    } else {
+      newExpanded.add(mealType);
+    }
+    setExpandedSections(newExpanded);
+    haptics.light();
+  };
+
   const renderMealSection = (mealType: MealType) => {
     const meals = mealsByType[mealType];
+    const isExpanded = expandedSections.has(mealType);
+    const ITEM_LIMIT = 5;
+    const hasMoreItems = meals.length > ITEM_LIMIT;
+    const displayMeals = hasMoreItems && !isExpanded ? meals.slice(0, ITEM_LIMIT) : meals;
 
     return (
       <Card variant="elevated" padding="lg" style={styles.mealSection}>
@@ -154,7 +170,7 @@ export default function DiaryScreen() {
             </TouchableOpacity>
           )}
         </View>
-        {meals.map((meal) => {
+        {displayMeals.map((meal) => {
           const isSelected = selectedMealIds.has(meal.id);
           const mealContent = (
             <>
@@ -266,6 +282,15 @@ export default function DiaryScreen() {
             </View>
           );
         })}
+        {hasMoreItems && (
+          <TouchableOpacity
+            style={styles.seeMoreButton}
+            onPress={() => toggleSectionExpansion(mealType)}>
+            <Text variant="body" weight="medium" style={{ color: themeColors.primary }}>
+              {isExpanded ? 'See less' : `See more (${meals.length - ITEM_LIMIT} more)`}
+            </Text>
+          </TouchableOpacity>
+        )}
       </Card>
     );
   };
@@ -553,6 +578,13 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 20,
     lineHeight: 20,
+  },
+  seeMoreButton: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.xs,
   },
 });
 
