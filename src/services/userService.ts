@@ -12,6 +12,7 @@ import type {
   TargetsResponse,
   ProgressResponse,
   UserProfileResponse,
+  UserProfileResponseExtended,
   UserProfileUpdateRequest,
   UserProfileUpdateRequestExtended,
   AdjustedTargetsResponse,
@@ -90,7 +91,7 @@ async function setCachedTargets(targets: SimpleTargets): Promise<void> {
   }
 }
 
-async function getCachedProfile(): Promise<UserProfileResponse | null> {
+async function getCachedProfile(): Promise<UserProfileResponseExtended | null> {
   try {
     const cached = await AsyncStorage.getItem(CACHE_KEYS.PROFILE);
     return cached ? JSON.parse(cached) : null;
@@ -99,7 +100,7 @@ async function getCachedProfile(): Promise<UserProfileResponse | null> {
   }
 }
 
-async function setCachedProfile(profile: UserProfileResponse): Promise<void> {
+async function setCachedProfile(profile: UserProfileResponseExtended): Promise<void> {
   try {
     await AsyncStorage.setItem(CACHE_KEYS.PROFILE, JSON.stringify(profile));
   } catch (error) {
@@ -176,9 +177,9 @@ export const userService = {
    * Get user profile (includes preferences)
    * GET /user/profile
    */
-  async getProfile(): Promise<UserProfileResponse | null> {
+  async getProfile(): Promise<UserProfileResponseExtended | null> {
     try {
-      const response = await apiClient.get<UserProfileResponse>('/user/profile');
+      const response = await apiClient.get<UserProfileResponseExtended>('/user/profile');
 
       if (response.error) {
         isApiAvailable = false;
