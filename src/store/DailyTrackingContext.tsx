@@ -177,7 +177,7 @@ export function DailyTrackingProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Load data on mount
+  // Load local data on mount (fast, for immediate UI)
   useEffect(() => {
     loadFromStorage();
   }, [loadFromStorage]);
@@ -307,6 +307,11 @@ export function DailyTrackingProvider({ children }: { children: ReactNode }) {
       }));
     }
   }, [recalculateConsumed, saveToStorage]);
+
+  // Refresh from backend on mount (after local load, for accurate data)
+  useEffect(() => {
+    refreshFromBackend();
+  }, [refreshFromBackend]);
 
   const updateConsumed = useCallback((macros: Partial<DailyMacros>) => {
     setTracking((prev) => ({

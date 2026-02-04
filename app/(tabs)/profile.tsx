@@ -551,6 +551,27 @@ export default function ProfileScreen() {
     saveAllergens();
   }, [allergenExclusions, isInitialLoad, isAuthenticated]);
 
+  // Save dietary restrictions when they change - sync to backend and local storage
+  React.useEffect(() => {
+    if (isInitialLoad) return;
+
+    const saveRestrictions = async () => {
+      // Save to local onboarding data
+      await saveOnboardingData({ dietaryRequirements: selectedRestrictions });
+
+      // Sync to backend if authenticated
+      if (isAuthenticated) {
+        try {
+          await userService.updateProfile({ dietary_restrictions: selectedRestrictions });
+        } catch (error) {
+          console.warn('[profile] Failed to sync dietary restrictions to backend:', error);
+        }
+      }
+    };
+
+    saveRestrictions();
+  }, [selectedRestrictions, isInitialLoad, isAuthenticated]);
+
   // Save disliked foods when they change - sync to local storage
   React.useEffect(() => {
     if (isInitialLoad) return;
