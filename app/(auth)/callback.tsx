@@ -8,6 +8,7 @@ import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { supabase } from '@/src/lib/supabase';
+import { authService } from '@/src/services/authService';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors, spacing } from '@/src/theme';
 import { Screen } from '@/src/ui/Screen';
@@ -104,11 +105,32 @@ export default function AuthCallbackScreen() {
       return;
     }
 
+    // CRITICAL: Create user record in backend before onboarding
+    // Without this, the auth gate will see 404 and redirect back to onboarding
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        console.log('[AuthCallback] Registering user with backend:', user.email);
+        const registration = await authService.completeRegistration(user.email);
+        if (registration.error) {
+          console.error('[AuthCallback] Registration failed:', registration.error);
+          // Don't block - user might already exist or this can be retried
+        } else {
+          console.log('[AuthCallback] User registered successfully');
+        }
+      }
+    } catch (regError) {
+      console.error('[AuthCallback] Registration error:', regError);
+      // Continue anyway - the complete.tsx will retry on failure
+    }
+
     setStatus('success');
 
-    // Navigate to login - the auth state listener will handle the rest
+    // Email verified! User is now authenticated.
+    // Navigate to onboarding for new users (they just signed up).
+    // The auth gate will redirect to tabs if onboarding is already complete.
     setTimeout(() => {
-      router.replace('/(auth)/login');
+      router.replace('/(onboarding)/goal');
     }, 1500);
   };
 
@@ -130,7 +152,7 @@ export default function AuthCallbackScreen() {
               Email Verified!
             </Text>
             <Text variant="body" color="secondary" style={styles.text}>
-              Redirecting to login...
+              Setting up your account...
             </Text>
           </>
         )}

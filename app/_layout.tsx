@@ -48,33 +48,38 @@ function AuthAndOnboardingGate({ children }: { children: React.ReactNode }) {
         // - You can redo onboarding even on a real, logged-in account
         // This does NOT affect production builds.
         if (__DEV__) {
-          console.log('[AuthGate] DEV build - using LOCAL onboarding flag only (ignoring backend profile)');
-          const onboardingComplete = await getOnboardingComplete();
-          console.log('[AuthGate] DEV - Local onboarding flag:', onboardingComplete);
+          console.log('[AuthGate] DEV build');
           console.log('[AuthGate] DEV - isAuthenticated:', isAuthenticated);
           console.log('[AuthGate] DEV - Current route:', currentRoute);
-          console.log('[AuthGate] DEV - All segments:', segments);
 
           const isOnboardingRoute = currentRoute === '(onboarding)';
           const isTabsRoute = currentRoute === '(tabs)';
           const isAuthRoute = currentRoute === '(auth)';
 
-          if (!onboardingComplete) {
-            // Onboarding not complete - always go to onboarding
-            console.log('[AuthGate] DEV - Onboarding NOT complete, redirecting to onboarding');
-            if (!isOnboardingRoute) {
-              router.replace('/(onboarding)/goal');
-            }
-          } else if (!isAuthenticated) {
-            // Onboarding complete but not logged in - go to login
-            console.log('[AuthGate] DEV - Onboarding complete but NOT authenticated, redirecting to login');
+          // RULE 1: Not authenticated -> always go to login first
+          if (!isAuthenticated) {
+            console.log('[AuthGate] DEV - NOT authenticated, redirecting to login');
             if (!isAuthRoute) {
               router.replace('/(auth)/login');
             }
+            setIsChecking(false);
+            return;
+          }
+
+          // RULE 2: Authenticated - check onboarding status
+          const onboardingComplete = await getOnboardingComplete();
+          console.log('[AuthGate] DEV - Onboarding complete:', onboardingComplete);
+
+          if (!onboardingComplete) {
+            // Authenticated but onboarding not complete -> onboarding
+            console.log('[AuthGate] DEV - Authenticated but onboarding NOT complete, redirecting to onboarding');
+            if (!isOnboardingRoute) {
+              router.replace('/(onboarding)/goal');
+            }
           } else {
-            // Onboarding complete AND authenticated - go to tabs (main app)
+            // Authenticated AND onboarding complete -> tabs
             if (!isTabsRoute) {
-              console.log('[AuthGate] DEV - Onboarding complete AND authenticated, redirecting to tabs');
+              console.log('[AuthGate] DEV - Authenticated AND onboarding complete, redirecting to tabs');
               router.replace('/(tabs)');
             }
           }
@@ -110,22 +115,13 @@ function AuthAndOnboardingGate({ children }: { children: React.ReactNode }) {
         const isAuthRoute = currentRoute === '(auth)';
         const isOnboardingRoute = currentRoute === '(onboarding)';
 
-        // RULE 1: Unauthenticated users:
-        // - If onboarding not complete -> go to onboarding
-        // - If onboarding complete -> go to auth/login
+        // RULE 1: Unauthenticated users -> always go to login first
+        // Onboarding happens AFTER authentication, not before
         if (!isAuthenticated) {
-          const onboardingComplete = await getOnboardingComplete();
-
-          if (!onboardingComplete) {
-            if (!isOnboardingRoute) {
-              router.replace('/(onboarding)/goal');
-            }
-          } else {
-            if (!isAuthRoute) {
-              router.replace('/(auth)/login');
-            }
+          console.log('[AuthGate] Not authenticated, redirecting to login');
+          if (!isAuthRoute) {
+            router.replace('/(auth)/login');
           }
-
           setIsChecking(false);
           return;
         }

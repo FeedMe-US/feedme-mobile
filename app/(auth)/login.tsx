@@ -78,7 +78,8 @@ export default function LoginScreen() {
 
       if (result.success) {
         haptics.success();
-        router.replace('/(tabs)');
+        // Don't navigate explicitly - the auth gate will detect the auth state change
+        // and route to tabs (if onboarding complete) or onboarding (if not)
       } else {
         Alert.alert('Login Failed', result.error || 'Invalid credentials');
         haptics.error();
