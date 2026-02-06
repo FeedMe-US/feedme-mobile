@@ -28,10 +28,14 @@ import { useDailyTracking } from '@/src/store/DailyTrackingContext';
 import { haptics } from '@/src/utils/haptics';
 import {
   MealPeriod,
+  RendezvousStation,
   getAvailableMealPeriods,
   getCurrentOrNextMealPeriod,
   isAllDayLocation,
+  isStationBasedLocation,
+  getStationTabs,
   formatMealPeriod,
+  formatStation,
   getLocationStatus,
 } from '@/src/utils/mealPeriodUtils';
 import { getPacificDateString } from '@/src/utils/dateUtils';
@@ -64,6 +68,7 @@ export function DiningHallDetailSheet({
   const router = useRouter();
 
   const [selectedPeriod, setSelectedPeriod] = useState<MealPeriod | null>(null);
+  const [selectedStation, setSelectedStation] = useState<RendezvousStation>('east');
   const [sections, setSections] = useState<MenuSection[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,18 +98,19 @@ export function DiningHallDetailSheet({
     if (visible && hall) {
       const defaultPeriod = getCurrentOrNextMealPeriod(hall);
       setSelectedPeriod(defaultPeriod);
+      setSelectedStation('east'); // Default to East for Rendezvous
       setSections([]);
       setError(null);
       setPlate([]); // Clear plate when opening new hall
     }
   }, [visible, hall]);
 
-  // Fetch menu when period changes
+  // Fetch menu when period or station changes
   useEffect(() => {
     if (visible && hall && selectedPeriod) {
       loadMenu();
     }
-  }, [visible, hall, selectedPeriod]);
+  }, [visible, hall, selectedPeriod, selectedStation]);
 
   const loadMenu = async () => {
     if (!hall || !selectedPeriod) return;
@@ -117,7 +123,20 @@ export function DiningHallDetailSheet({
       const menu = await mealService.getMenu(hall.id, today);
 
       if (menu && menu.meals[selectedPeriod]) {
-        setSections(menu.meals[selectedPeriod].sections);
+        let menuSections = menu.meals[selectedPeriod].sections;
+
+        // Filter by station for Rendezvous (ID 39)
+        if (isStationBasedLocation(hall)) {
+          menuSections = menuSections.map(section => ({
+            ...section,
+            items: section.items.filter(item =>
+              // Include items that match the selected station OR have no station (shared items)
+              item.station === selectedStation || item.station === null || item.station === undefined
+            ),
+          })).filter(section => section.items.length > 0); // Remove empty sections
+        }
+
+        setSections(menuSections);
       } else {
         setSections([]);
         setError('No menu available for this meal period');
@@ -134,6 +153,11 @@ export function DiningHallDetailSheet({
   const handlePeriodChange = (period: MealPeriod) => {
     haptics.selection();
     setSelectedPeriod(period);
+  };
+
+  const handleStationChange = (station: RendezvousStation) => {
+    haptics.selection();
+    setSelectedStation(station);
   };
 
   const handleItemPress = (item: MenuItem) => {
@@ -273,6 +297,8 @@ export function DiningHallDetailSheet({
 
   const availablePeriods = getAvailableMealPeriods(hall);
   const isAllDay = isAllDayLocation(hall);
+  const isStationBased = isStationBasedLocation(hall);
+  const stationTabs = getStationTabs();
 
   const renderMenuItem = (item: MenuItem, index: number) => {
     const quantity = getItemQuantity(item);
@@ -448,8 +474,29 @@ export function DiningHallDetailSheet({
                   </View>
                 )}
 
-                {/* Meal Period Selector (hidden for all-day locations) */}
-                {!isAllDay && availablePeriods.length > 0 && (
+                {/* Station Selector for Rendezvous (East/West split) */}
+                {isStationBased && (
+                  <View style={styles.periodSelector}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.periodSelectorContent}
+                    >
+                      {stationTabs.map((station) => (
+                        <Chip
+                          key={station}
+                          label={formatStation(station)}
+                          selected={selectedStation === station}
+                          onPress={() => handleStationChange(station)}
+                          style={styles.periodChip}
+                        />
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {/* Meal Period Selector (hidden for all-day and station-based locations) */}
+                {!isAllDay && !isStationBased && availablePeriods.length > 0 && (
                   <View style={styles.periodSelector}>
                     <ScrollView
                       horizontal
@@ -502,9 +549,11 @@ export function DiningHallDetailSheet({
                   ) : (
                     <View style={styles.emptyContainer}>
                       <Text variant="body" color="secondary">
-                        {selectedPeriod
-                          ? `No items available for ${formatMealPeriod(selectedPeriod)}`
-                          : 'No menu available'}
+                        {isStationBased
+                          ? `No items available for ${formatStation(selectedStation)}`
+                          : selectedPeriod
+                            ? `No items available for ${formatMealPeriod(selectedPeriod)}`
+                            : 'No menu available'}
                       </Text>
                     </View>
                   )}

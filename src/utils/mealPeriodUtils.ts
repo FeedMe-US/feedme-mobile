@@ -156,3 +156,35 @@ export function formatMealPeriod(period: MealPeriod): string {
   };
   return labels[period] || period;
 }
+
+// ============================================================================
+// RENDEZVOUS EAST/WEST SPLIT (ID: 39)
+// ============================================================================
+
+export type RendezvousStation = 'east' | 'west';
+
+/**
+ * Check if a location uses the East/West station split (Rendezvous).
+ * Rendezvous (ID 39) has two halves: East (Asian) and West (Latin).
+ */
+export function isStationBasedLocation(hall: DiningHall): boolean {
+  return hall.id === 39;
+}
+
+/**
+ * Get the station tabs for Rendezvous.
+ */
+export function getStationTabs(): RendezvousStation[] {
+  return ['east', 'west'];
+}
+
+/**
+ * Format station name for display.
+ */
+export function formatStation(station: RendezvousStation): string {
+  const labels: Record<RendezvousStation, string> = {
+    east: 'East (Asian)',
+    west: 'West (Latin)',
+  };
+  return labels[station];
+}
