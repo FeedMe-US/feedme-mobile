@@ -19,6 +19,7 @@ import { Text } from '@/src/ui/Text';
 import { Button } from '@/src/ui/Button';
 import { haptics } from '@/src/utils/haptics';
 import { formatCalories, formatMacro } from '@/src/utils/formatNutrition';
+import { getLocationStatus } from '@/src/utils/mealPeriodUtils';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
@@ -38,7 +39,7 @@ export default function HomeScreen() {
   const [selectedHallSlug, setSelectedHallSlug] = useState<string | null>(null);
   const [selectedHallMode, setSelectedHallMode] = useState<'specific' | 'hill' | 'campus'>('hill');
   const [diningHalls, setDiningHalls] = useState<string[]>([]);
-  const [diningHallsData, setDiningHallsData] = useState<Map<string, { isOpen: boolean; availablePeriods?: string[] }>>(new Map());
+  const [diningHallsData, setDiningHallsData] = useState<Map<string, DiningHall>>(new Map());
   const [closestHallSlug, setClosestHallSlug] = useState<string | null>(null);
 
   // Meal period and mood selection
@@ -86,8 +87,8 @@ export default function HomeScreen() {
     }
     if (selectedHallSlug) {
       const hallData = diningHallsData.get(selectedHallSlug);
-      if (hallData?.availablePeriods && hallData.availablePeriods.length > 0) {
-        return hallData.availablePeriods as MealPeriod[];
+      if (hallData?.available_periods && hallData.available_periods.length > 0) {
+        return hallData.available_periods as MealPeriod[];
       }
     }
     // Default to all periods
@@ -100,11 +101,12 @@ export default function HomeScreen() {
     if (selectedHallMode === 'specific' && !selectedHallSlug) return;
 
     // Check if the selected hall is closed (for specific mode)
+    // Use getLocationStatus() for consistent behavior with menu screen
     if (selectedHallMode === 'specific' && selectedHallSlug) {
       const hallData = diningHallsData.get(selectedHallSlug);
-      const isOpen = hallData?.isOpen ?? false;
-      
-      if (!isOpen) {
+      const statusInfo = hallData ? getLocationStatus(hallData) : { status: 'closed' };
+
+      if (statusInfo.status === 'closed') {
         // Hall is closed - show closed message immediately
         const hallNameMap: Record<string, string> = {
           'bruin-plate': 'Bruin Plate',
@@ -490,30 +492,23 @@ useFocusEffect(
         hallSlugs = [closestSlug, ...hallSlugs.filter(slug => slug !== closestSlug)];
       }
 
-      // Store open/closed status and available periods for each hall
-      // Use preferredHalls (which includes fallbacks) to ensure all displayed halls are in the map
-      const hallsDataMap = new Map<string, { isOpen: boolean; availablePeriods?: string[] }>();
-      
-      // First, populate from mergedHalls (has API data)
+      // Store full DiningHall objects for each hall
+      // This enables using getLocationStatus() for consistent open/closed detection
+      const hallsDataMap = new Map<string, DiningHall>();
+
+      // First, populate from mergedHalls (has API data with is_open_now, next_meal_time, etc.)
       mergedHalls.forEach(hall => {
-        hallsDataMap.set(hall.slug, {
-          isOpen: hall.is_open_now || false,
-          availablePeriods: hall.available_periods || ['breakfast', 'lunch', 'dinner', 'late_night'],
-        });
+        hallsDataMap.set(hall.slug, hall);
       });
-      
+
       // Then, ensure all preferred halls (including fallbacks) are in the map
       // This handles cases where a preferred hall wasn't in the API response
       preferredHalls.forEach(hall => {
         if (!hallsDataMap.has(hall.slug)) {
-          // Fallback hall not in API - use its is_open_now status (defaults to false)
-          hallsDataMap.set(hall.slug, {
-            isOpen: hall.is_open_now || false,
-            availablePeriods: hall.available_periods || ['breakfast', 'lunch', 'dinner', 'late_night'],
-          });
+          hallsDataMap.set(hall.slug, hall);
         }
       });
-      
+
       setDiningHallsData(hallsDataMap);
 
       setDiningHalls(hallSlugs);
@@ -901,9 +896,11 @@ useFocusEffect(
                   .join(' ');
                 // Remove "Closed" suffix if present
                 hallName = hallName.replace(/\s*\(?Closed\)?/gi, '').trim();
-                // Get open status from diningHallsData - default to false (closed/dim) if not found
-                const isOpen = diningHallsData.get(hallSlug)?.isOpen ?? false;
-                const chipStyle = !isOpen
+                // Get open status using getLocationStatus() for consistency with menu screen
+                // This properly handles "Open", "Opening Soon", and "Closed" states
+                const hallData = diningHallsData.get(hallSlug);
+                const statusInfo = hallData ? getLocationStatus(hallData) : { status: 'closed' };
+                const chipStyle = statusInfo.status === 'closed'
                   ? { ...styles.diningHallChip, opacity: 0.6 }
                   : styles.diningHallChip;
                 const isClosest = closestHallSlug === hallSlug;
