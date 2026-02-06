@@ -639,6 +639,62 @@ useFocusEffect(
     Alert.alert('Macro Logging', 'Macro logging feature coming soon');
   };
 
+  // State to track if we're finding nearest hall
+  const [isFindingNearest, setIsFindingNearest] = useState(false);
+
+  // Handle "Nearest Open Hall" button tap
+  const handleNearestHall = async () => {
+    // Prevent double-tap while already finding
+    if (isFindingNearest) return;
+
+    haptics.medium();
+    setIsFindingNearest(true);
+
+    try {
+      // Get user location
+      const userLocation = await locationService.getCurrentLocation();
+      if (!userLocation) {
+        Alert.alert('Location Unavailable', 'Please enable location services to find the nearest dining hall.');
+        return;
+      }
+
+      // Map slugs to IDs for preferred halls
+      const slugToId: Record<string, number> = {
+        'bruin-plate': 29, 'de-neve-dining': 28, 'epicuria-at-covel': 31,
+        'spice-kitchen': 30, 'rendezvous': 39, 'the-study-at-hedrick': 37,
+        'the-drey': 38, 'bruin-cafe': 34, 'cafe-1919': 36, 'epicuria-at-ackerman': 41,
+      };
+      const preferredIds = diningHalls
+        .map(slug => slugToId[slug])
+        .filter((id): id is number => id !== undefined);
+
+      // Find nearest open hall using UCLA walking times
+      const result = await mealService.getNearestOpenHall(
+        userLocation.latitude,
+        userLocation.longitude,
+        preferredIds.length > 0 ? preferredIds : undefined
+      );
+
+      if (!result) {
+        Alert.alert('No Open Halls', 'No dining halls are currently open.');
+        return;
+      }
+
+      // Select the nearest hall and trigger recommendation
+      setSelectedHallMode('specific');
+      setSelectedHallSlug(result.hall.slug);
+
+      // Update generation key to force regeneration (use current meal period or fallback)
+      const mealPeriod = selectedMealPeriod || getCurrentMealPeriod();
+      lastGenerationKey.current = `nearest-${result.hall.slug}-${mealPeriod}`;
+    } catch (error) {
+      console.error('[Home] Error finding nearest hall:', error);
+      Alert.alert('Error', 'Could not find nearest dining hall. Please try again.');
+    } finally {
+      setIsFindingNearest(false);
+    }
+  };
+
   return (
     <Screen safeBottom={false}>
       <View style={styles.container}>
@@ -797,6 +853,15 @@ useFocusEffect(
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={[styles.diningHallChips, { paddingLeft: spacing.lg, paddingRight: spacing.lg }]}>
+              {/* Nearest Open Hall button - uses UCLA walking times */}
+              <Chip
+                key="nearest"
+                label={isFindingNearest ? "Finding..." : "Nearest Open"}
+                selected={false}
+                onPress={handleNearestHall}
+                style={isFindingNearest ? { ...styles.diningHallChip, opacity: 0.6 } : styles.diningHallChip}
+                icon={<AppIcon type="location" size={16} color={themeColors.primary} />}
+              />
               {/* Regular hall chips - closest hall first with location icon */}
               {diningHalls.map((hallSlug) => {
                 // Map slugs to proper display names

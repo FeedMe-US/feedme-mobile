@@ -5,6 +5,7 @@
 
 import { apiClient } from './api';
 import { MealType } from '../store/DailyTrackingContext';
+import { sortHallsByWalkingTime } from '../utils/walkingTimeService';
 
 // Meal period type for API requests
 export type MealPeriod = 'breakfast' | 'lunch' | 'dinner' | 'late_night';
@@ -53,6 +54,8 @@ export interface MenuItem {
   fat_g: number;
   tags: string[];
   allergens: string[];
+  // Station for Rendezvous East/West split
+  station?: 'east' | 'west' | null;
   // Extended nutrition
   serving_size?: string | null;
   fiber_g?: number | null;
@@ -282,7 +285,8 @@ class MealService {
   }
 
   /**
-   * Get dining halls sorted by distance and preferences
+   * Get dining halls sorted by walking time and preferences
+   * Uses UCLA-specific walking time estimates based on campus zones
    */
   async getDiningHallsSorted(
     userLat?: number,
@@ -302,16 +306,76 @@ class MealService {
       });
     }
 
-    // Then sort by distance if location provided
+    // Then sort by walking time if location provided
     if (userLat !== undefined && userLng !== undefined) {
+      // Use zone-based walking times for UCLA-accurate sorting
+      const walkingTimes = sortHallsByWalkingTime(
+        userLat,
+        userLng,
+        halls.map(h => h.id)
+      );
+
+      // Create a map of ID to walking time for sorting
+      const timeMap = new Map(walkingTimes.map(w => [w.locationId, w.walkingMinutes]));
+
       halls = [...halls].sort((a, b) => {
-        const distA = this.getDistance(userLat, userLng, a.latitude || 0, a.longitude || 0);
-        const distB = this.getDistance(userLat, userLng, b.latitude || 0, b.longitude || 0);
-        return distA - distB;
+        const timeA = timeMap.get(a.id) ?? Infinity;
+        const timeB = timeMap.get(b.id) ?? Infinity;
+        return timeA - timeB;
       });
     }
 
     return halls;
+  }
+
+  /**
+   * Get the nearest open dining hall by walking time
+   * @param userLat User's latitude
+   * @param userLng User's longitude
+   * @param preferredIds Optional list of preferred hall IDs to filter by
+   * @returns The nearest open hall, or null if none available
+   */
+  async getNearestOpenHall(
+    userLat: number,
+    userLng: number,
+    preferredIds?: number[],
+  ): Promise<{ hall: DiningHall; walkingMinutes: number } | null> {
+    const halls = await this.getDiningHalls();
+
+    // Filter to only open halls
+    let openHalls = halls.filter(h => h.is_open_now);
+
+    // Further filter by preferred IDs if provided
+    if (preferredIds && preferredIds.length > 0) {
+      openHalls = openHalls.filter(h => preferredIds.includes(h.id));
+    }
+
+    if (openHalls.length === 0) {
+      return null;
+    }
+
+    // Sort by walking time
+    const sorted = sortHallsByWalkingTime(
+      userLat,
+      userLng,
+      openHalls.map(h => h.id)
+    );
+
+    if (sorted.length === 0) {
+      return null;
+    }
+
+    const nearestId = sorted[0].locationId;
+    const nearestHall = openHalls.find(h => h.id === nearestId);
+
+    if (!nearestHall) {
+      return null;
+    }
+
+    return {
+      hall: nearestHall,
+      walkingMinutes: sorted[0].walkingMinutes,
+    };
   }
 
   /**
