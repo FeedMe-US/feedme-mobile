@@ -7,13 +7,14 @@
     "icon": "./assets/images/icon.png",
     "scheme": "ucnutrition",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.feedme.ucnutrition",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "FeedMe needs access to your camera to scan meals and analyze nutrition.",
-        "NSLocationWhenInUseUsageDescription": "FeedMe uses your location to suggest nearby dining halls."
+        "NSLocationWhenInUseUsageDescription": "FeedMe uses your location to suggest nearby dining halls.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
