@@ -29,9 +29,7 @@ import { haptics } from '@/src/utils/haptics';
 import {
   MealPeriod,
   RendezvousStation,
-  getAvailableMealPeriods,
   getCurrentOrNextMealPeriod,
-  isAllDayLocation,
   isStationBasedLocation,
   getStationTabs,
   formatMealPeriod,
@@ -76,6 +74,11 @@ export function DiningHallDetailSheet({
   const [itemModalVisible, setItemModalVisible] = useState(false);
   const [recommendLoading, setRecommendLoading] = useState(false);
 
+  // Track which periods actually have menu data (derived from API response)
+  // This prevents showing empty tabs for periods with no items
+  const [menuPeriodsWithData, setMenuPeriodsWithData] = useState<MealPeriod[]>([]);
+  const [periodsHaveIdenticalContent, setPeriodsHaveIdenticalContent] = useState(false);
+
   // Plate building state
   const [plate, setPlate] = useState<PlateItem[]>([]);
 
@@ -93,24 +96,97 @@ export function DiningHallDetailSheet({
     );
   }, [plate]);
 
-  // Reset state when hall changes or sheet opens
+  // Reset state and load menu when hall changes or sheet opens
   useEffect(() => {
     if (visible && hall) {
-      const defaultPeriod = getCurrentOrNextMealPeriod(hall);
-      setSelectedPeriod(defaultPeriod);
       setSelectedStation('east'); // Default to East for Rendezvous
       setSections([]);
       setError(null);
       setPlate([]); // Clear plate when opening new hall
+      setMenuPeriodsWithData([]);
+      setPeriodsHaveIdenticalContent(false);
+
+      // Pre-fetch menu to determine which periods actually have data
+      const loadMenuAndDeterminePeriods = async () => {
+        setLoading(true);
+        try {
+          const today = getTodayDate();
+          const menu = await mealService.getMenu(hall.id, today);
+
+          if (menu && menu.meals) {
+            // Get periods that actually have menu items
+            const periodsWithItems = (Object.keys(menu.meals) as MealPeriod[]).filter(
+              period => {
+                const mealMenu = menu.meals[period];
+                return mealMenu?.sections?.some(section => section.items.length > 0);
+              }
+            );
+
+            // Check if all periods have identical content (all_day scenario)
+            // Compare item counts and first few recipe IDs to detect duplicates
+            let allIdentical = false;
+            if (periodsWithItems.length >= 2) {
+              const getItemSignature = (period: string) => {
+                const sections = menu.meals[period]?.sections || [];
+                const ids = sections.flatMap(s => s.items.map(i => i.recipe_id)).sort();
+                return ids.join(',');
+              };
+              const firstSignature = getItemSignature(periodsWithItems[0]);
+              allIdentical = periodsWithItems.every(p => getItemSignature(p) === firstSignature);
+            }
+
+            setMenuPeriodsWithData(periodsWithItems);
+            setPeriodsHaveIdenticalContent(allIdentical);
+
+            // Determine default period: prefer current/next meal if it has data
+            const preferredPeriod = getCurrentOrNextMealPeriod(hall);
+            const defaultPeriod = preferredPeriod && periodsWithItems.includes(preferredPeriod)
+              ? preferredPeriod
+              : periodsWithItems[0] || null;
+
+            setSelectedPeriod(defaultPeriod);
+
+            // Load sections for the default period
+            if (defaultPeriod && menu.meals[defaultPeriod]) {
+              let menuSections = menu.meals[defaultPeriod].sections;
+
+              // Filter by station for Rendezvous (ID 39)
+              if (isStationBasedLocation(hall)) {
+                menuSections = menuSections.map(section => ({
+                  ...section,
+                  items: section.items.filter(item =>
+                    item.station === 'east' || item.station === null || item.station === undefined
+                  ),
+                })).filter(section => section.items.length > 0);
+              }
+
+              setSections(menuSections);
+            }
+          } else {
+            setMenuPeriodsWithData([]);
+            setSelectedPeriod(null);
+            setError('No menu available');
+          }
+        } catch (err) {
+          console.error('Failed to load menu:', err);
+          setError('Failed to load menu');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadMenuAndDeterminePeriods();
     }
   }, [visible, hall]);
 
-  // Fetch menu when period or station changes
+  // Fetch menu when period or station changes (after initial load)
   useEffect(() => {
-    if (visible && hall && selectedPeriod) {
-      loadMenu();
+    // Skip if this is the initial load (handled above) or if no period selected
+    if (!visible || !hall || !selectedPeriod || menuPeriodsWithData.length === 0) {
+      return;
     }
-  }, [visible, hall, selectedPeriod, selectedStation]);
+    loadMenu();
+  }, [selectedPeriod, selectedStation]);
 
   const loadMenu = async () => {
     if (!hall || !selectedPeriod) return;
@@ -295,8 +371,6 @@ export function DiningHallDetailSheet({
 
   if (!hall) return null;
 
-  const availablePeriods = getAvailableMealPeriods(hall);
-  const isAllDay = isAllDayLocation(hall);
   const isStationBased = isStationBasedLocation(hall);
   const stationTabs = getStationTabs();
 
@@ -495,15 +569,19 @@ export function DiningHallDetailSheet({
                   </View>
                 )}
 
-                {/* Meal Period Selector (hidden for all-day and station-based locations) */}
-                {!isAllDay && !isStationBased && availablePeriods.length > 0 && (
+                {/* Meal Period Selector - only show when:
+                    - Not a station-based location (Rendezvous uses East/West tabs instead)
+                    - 2+ periods have actual menu data
+                    - Periods have DIFFERENT content (hide if all periods are identical, i.e. all_day)
+                */}
+                {!isStationBased && menuPeriodsWithData.length >= 2 && !periodsHaveIdenticalContent && (
                   <View style={styles.periodSelector}>
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={false}
                       contentContainerStyle={styles.periodSelectorContent}
                     >
-                      {availablePeriods.map((period) => (
+                      {menuPeriodsWithData.map((period) => (
                         <Chip
                           key={period}
                           label={formatMealPeriod(period)}
