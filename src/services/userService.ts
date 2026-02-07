@@ -425,6 +425,26 @@ export const userService = {
       return false;
     }
   },
+
+  /**
+   * Delete user account
+   * DELETE /auth/me
+   */
+  async deleteAccount(): Promise<boolean> {
+    try {
+      const response = await apiClient.delete('/auth/me');
+
+      if (response.error) {
+        console.warn('[userService] Failed to delete account:', response.error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.warn('[userService] Network error deleting account:', error);
+      return false;
+    }
+  },
 };
 
 // Export types for backwards compatibility

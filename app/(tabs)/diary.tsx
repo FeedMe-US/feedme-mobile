@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     paddingHorizontal: spacing.sm,
-    
+
     paddingVertical: spacing.xs,
     borderRadius: radius.sm,
   },

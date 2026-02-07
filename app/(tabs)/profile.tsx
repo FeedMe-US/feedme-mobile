@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Platform, Linking, Text as RNText } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors, spacing, radius } from '@/src/theme';
 import { Screen } from '@/src/ui/Screen';
@@ -22,7 +23,7 @@ import { CarbFatSlider } from '@/src/components/CarbFatSlider';
 import { resetOnboarding } from '@/src/lib/onboarding';
 import { useRouter } from 'expo-router';
 import { getOnboardingData, saveOnboardingData } from '@/src/lib/onboardingData';
-import { useIsAuthenticated } from '@/src/store/authStore';
+import { useAuthStore, useIsAuthenticated } from '@/src/store/authStore';
 import { apiClient } from '@/src/services/api';
 import { userService } from '@/src/services/userService';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -59,6 +60,8 @@ export default function ProfileScreen() {
   const [useCustomTargets, setUseCustomTargets] = useState(false); // When true, skip auto-calculation
   const [carbFatRatio, setCarbFatRatio] = useState(1.5); // Default 60/40 carb/fat split
   const [proteinLocked, setProteinLocked] = useState(true); // Protein auto-calculates by default
+  const [dietStrictness, setDietStrictness] = useState<'strict' | 'balanced' | 'relaxed'>('balanced');
+  const [showDietStrictnessPicker, setShowDietStrictnessPicker] = useState(false);
 
   const dietaryRestrictions = ['Vegetarian', 'Vegan', 'Pescatarian', 'Halal', 'Kosher', 'Gluten-free', 'None'];
 
@@ -108,7 +111,7 @@ export default function ProfileScreen() {
   const diningHalls = [
     // Hill & residential dining halls (canonical names matching database)
     'De Neve Dining',
-    'BPlate',
+    'Bruin Plate',
     'Feast',
     'Epicuria at Covel',
     'Epicuria at Ackerman',
@@ -131,11 +134,12 @@ export default function ProfileScreen() {
   // Micronutrients available from backend (matching nutrition table columns)
   const vitamins = ['Vitamin D', 'Vitamin B12', 'Vitamin C', 'Iron', 'Calcium', 'Potassium', 'Vitamin A', 'Vitamin B6'];
   const goalTypes = ['Cut', 'Maintain', 'Lean Muscle Growth', 'Bulk'];
+  const dietStrictnessLevels = ['Strict', 'Balanced', 'Relaxed'];
 
   const [selectedRestrictions, setSelectedRestrictions] = useState<string[]>([]);
   const [allergenExclusions, setAllergenExclusions] = useState<string[]>([]); // Safety - hard filter (stored as IDs from onboarding)
   const [dislikedFoods, setDislikedFoods] = useState<string[]>([]); // Preference - soft filter (stored as display names)
-  const [selectedHalls, setSelectedHalls] = useState<string[]>(['BPlate', 'De Neve Dining']);
+  const [selectedHalls, setSelectedHalls] = useState<string[]>(['Bruin Plate', 'De Neve Dining']);
   const [selectedVitamins, setSelectedVitamins] = useState<string[]>(['Vitamin D', 'Vitamin B12', 'Iron']);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
@@ -167,7 +171,7 @@ export default function ProfileScreen() {
       const locationIdToName: Record<number, string> = {
         // Residential dining
         28: 'De Neve Dining',
-        29: 'BPlate',
+        29: 'Bruin Plate',
         30: 'Feast',
         31: 'Epicuria at Covel',
         // Hill / campus restaurants
@@ -194,7 +198,6 @@ export default function ProfileScreen() {
         // Legacy slugs from onboarding/local storage
         'de-neve': 'De Neve',
         'de-neve-dining': 'De Neve Dining',
-        'b-plate': 'BPlate',
         'bruin-plate': 'Bruin Plate',
         'epicuria': 'Epicuria',
         'epicuria-at-covel': 'Epicuria at Covel',
@@ -391,6 +394,9 @@ export default function ProfileScreen() {
         if (data.selectedVitamins?.length) {
           setSelectedVitamins(data.selectedVitamins);
         }
+        if (data.dietStrictness) {
+          setDietStrictness(data.dietStrictness);
+        }
         setIsInitialLoad(false);
       } catch (error) {
         console.error('Error loading profile data:', error);
@@ -426,7 +432,6 @@ export default function ProfileScreen() {
         // Residential dining
         'De Neve': 28,
         'De Neve Dining': 28,
-        'BPlate': 29,
         'Bruin Plate': 29,
         'Feast': 30,
         'Epicuria': 31,
@@ -455,7 +460,6 @@ export default function ProfileScreen() {
         // Residential dining
         'De Neve': 'de-neve-dining',
         'De Neve Dining': 'de-neve-dining',
-        'BPlate': 'b-plate',
         'Bruin Plate': 'bruin-plate',
         'Feast': 'spice-kitchen',
         'Epicuria': 'epicuria-at-covel',
@@ -604,7 +608,7 @@ export default function ProfileScreen() {
     const weightKg = parseFloat(weight) * 0.453592;
     const heightCm = (parseFloat(heightFeet) * 30.48) + (parseFloat(heightInches) * 2.54);
     const ageNum = parseFloat(age);
-    
+
     let bmr = 0;
     if (gender === 'male') {
       bmr = 10 * weightKg + 6.25 * heightCm - 5 * ageNum + 5;
@@ -625,7 +629,7 @@ export default function ProfileScreen() {
     };
 
     const tdee = bmr * (activityMultipliers[activityLevel] || 1.55);
-    
+
     // Adjust for goal type
     let targetCalories = tdee;
     if (goalType === 'Cut') {
@@ -1133,29 +1137,52 @@ export default function ProfileScreen() {
           </View>
 
           {/* Activity Level */}
-          <View style={styles.activitySection}>
-            <Text variant="body" color="secondary" style={styles.activityLabel}>
-              Activity Level
-            </Text>
-            <TouchableOpacity
-              style={[
-                styles.activityButton,
-                {
-                  backgroundColor: themeColors.cardBackgroundSecondary,
-                  borderWidth: 1,
-                  borderColor: themeColors.border,
-                },
-              ]}
-              onPress={() => {
-                haptics.medium();
-                setShowActivityPicker(true);
-              }}>
-              <Text variant="body" weight="semibold">
-                {activityLevel}
-              </Text>
-              <AppIcon type="chevron-up-down" size={16} color={themeColors.textSecondary} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => {
+              haptics.medium();
+              setShowActivityPicker(true);
+            }}>
+            <View style={[styles.preferenceRow, { borderBottomWidth: 0 }]}>
+              <View style={styles.preferenceLabelContainer}>
+                <View style={[styles.iconContainer, { backgroundColor: themeColors.primary + '15' }]}>
+                  <MaterialIcons name="fitness-center" size={20} color={themeColors.primary} />
+                </View>
+                <View>
+                  <Text variant="h4" weight="medium">Activity Level</Text>
+                  <Text variant="caption" color="secondary">Impacts calorie needs</Text>
+                </View>
+              </View>
+              <View style={styles.valueContainer}>
+                <Text variant="body" color="primary">{activityLevel}</Text>
+                <MaterialIcons name="chevron-right" size={20} color={themeColors.textSecondary} />
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          {/* Adherence Tier */}
+          <TouchableOpacity
+            onPress={() => {
+              haptics.medium();
+              setShowDietStrictnessPicker(true);
+            }}>
+            <View style={[styles.preferenceRow, { borderBottomWidth: 0 }]}>
+              <View style={styles.preferenceLabelContainer}>
+                <View style={[styles.iconContainer, { backgroundColor: themeColors.primary + '15' }]}>
+                  <MaterialIcons name="restaurant-menu" size={20} color={themeColors.primary} />
+                </View>
+                <View>
+                  <Text variant="h4" weight="medium">Adherence Tier</Text>
+                  <Text variant="caption" color="secondary">Strictness of recommendations</Text>
+                </View>
+              </View>
+              <View style={styles.valueContainer}>
+                <Text variant="body" color="primary">
+                  {dietStrictness.charAt(0).toUpperCase() + dietStrictness.slice(1)}
+                </Text>
+                <MaterialIcons name="chevron-right" size={20} color={themeColors.textSecondary} />
+              </View>
+            </View>
+          </TouchableOpacity>
         </Card>
 
         {/* Macro Targets Card - Matching screenshot design */}
@@ -1480,15 +1507,15 @@ export default function ProfileScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.chipsContainer}>
               {dietaryRestrictions.map((restriction) => (
-              <Chip
-                key={restriction}
-                label={restriction}
-                selected={selectedRestrictions.includes(restriction)}
-                onPress={() =>
-                  toggleSelection(restriction, selectedRestrictions, setSelectedRestrictions)
-                }
-                style={styles.chip}
-              />
+                <Chip
+                  key={restriction}
+                  label={restriction}
+                  selected={selectedRestrictions.includes(restriction)}
+                  onPress={() =>
+                    toggleSelection(restriction, selectedRestrictions, setSelectedRestrictions)
+                  }
+                  style={styles.chip}
+                />
               ))}
             </ScrollView>
           </View>
@@ -1591,13 +1618,13 @@ export default function ProfileScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.chipsContainer}>
               {diningHalls.map((hall) => (
-              <Chip
-                key={hall}
-                label={hall}
-                selected={selectedHalls.includes(hall)}
-                onPress={() => toggleSelection(hall, selectedHalls, setSelectedHalls)}
-                style={styles.chip}
-              />
+                <Chip
+                  key={hall}
+                  label={hall}
+                  selected={selectedHalls.includes(hall)}
+                  onPress={() => toggleSelection(hall, selectedHalls, setSelectedHalls)}
+                  style={styles.chip}
+                />
               ))}
             </ScrollView>
           </View>
@@ -1693,12 +1720,23 @@ export default function ProfileScreen() {
               ]}
               onPress={() => {
                 haptics.medium();
-                Alert.alert('Log Out', 'Are you sure you want to log out?');
+                Alert.alert('Log Out', 'Are you sure you want to log out?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Log Out',
+                    style: 'destructive',
+                    onPress: async () => {
+                      await useAuthStore.getState().signOut();
+                      router.replace('/auth/welcome');
+                    },
+                  },
+                ]);
               }}>
               <Text variant="body" weight="semibold" style={{ color: themeColors.text }}>
                 Log Out
               </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={[
                 styles.deleteAccountButton,
@@ -1711,52 +1749,23 @@ export default function ProfileScreen() {
                 haptics.medium();
                 Alert.alert('Delete Account', 'This action cannot be undone. Are you sure?', [
                   { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: () => {} },
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                      const success = await userService.deleteAccount();
+                      if (success) {
+                        await useAuthStore.getState().signOut();
+                        router.replace('/auth/welcome');
+                      } else {
+                        Alert.alert('Error', 'Failed to delete account. Please try again.');
+                      }
+                    },
+                  },
                 ]);
               }}>
               <Text variant="bodySmall" weight="semibold" style={{ color: themeColors.error }}>
                 Delete Account
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Reset Food Preferences */}
-          <View style={styles.accountSection}>
-            <TouchableOpacity
-              style={[
-                styles.logOutButton,
-                {
-                  backgroundColor: themeColors.cardBackgroundSecondary,
-                  borderWidth: 1,
-                  borderColor: themeColors.warning,
-                },
-              ]}
-              onPress={() => {
-                haptics.medium();
-                Alert.alert(
-                  'Reset Food Preferences?',
-                  'This will reset all learned food preferences.\n\nYour dietary restrictions and allergies will NOT be affected.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Reset',
-                      style: 'destructive',
-                      onPress: async () => {
-                        const success = await userService.resetPreferences();
-                        if (success) {
-                          haptics.success();
-                          Alert.alert('Success', 'Your food preferences have been reset.');
-                        } else {
-                          haptics.error();
-                          Alert.alert('Error', 'Failed to reset preferences. Please try again.');
-                        }
-                      },
-                    },
-                  ]
-                );
-              }}>
-              <Text variant="body" weight="semibold" style={{ color: themeColors.warning }}>
-                Reset Food Preferences
               </Text>
             </TouchableOpacity>
           </View>
@@ -1894,49 +1903,114 @@ export default function ProfileScreen() {
       {/* Activity Level Picker - Scrollable */}
       <Modal
         visible={showActivityPicker}
-        transparent
+        transparent={true}
         animationType="slide"
-        onRequestClose={() => setShowActivityPicker(false)}>
-        <View style={styles.modalOverlay}>
-          <Card variant="elevated" padding="lg" style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text variant="h4" weight="semibold" style={styles.modalTitle}>
-                Activity Level
-              </Text>
+        onRequestClose={() => setShowActivityPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowActivityPicker(false)}
+        >
+          <View style={[styles.pickerContainer, { backgroundColor: themeColors.background }]}>
+            <View style={styles.pickerHeader}>
+              <Text variant="h3" weight="bold">Select Activity Level</Text>
               <TouchableOpacity onPress={() => setShowActivityPicker(false)}>
-                <AppIcon type="close" size={20} color={themeColors.text} />
+                <MaterialIcons name="close" size={24} color={themeColors.text} />
               </TouchableOpacity>
             </View>
-            <ScrollView
-              style={styles.activityScroll}
-              contentContainerStyle={styles.activityScrollContent}
-              showsVerticalScrollIndicator={true}>
+            <ScrollView>
               {activityLevels.map((level) => (
                 <TouchableOpacity
                   key={level}
                   style={[
-                    styles.activityOption,
-                    activityLevel === level && { backgroundColor: themeColors.primary + '20' },
+                    styles.pickerOption,
+                    { borderBottomColor: themeColors.border }
                   ]}
                   onPress={() => {
-                    setActivityLevel(level);
+                    handleEditField('activity_level', level);
                     setShowActivityPicker(false);
                     haptics.selection();
-                  }}>
+                  }}
+                >
                   <Text
                     variant="body"
-                    weight={activityLevel === level ? 'semibold' : 'medium'}
-                    style={{ color: activityLevel === level ? themeColors.primary : themeColors.text }}>
+                    style={{
+                      color: activityLevel === level ? themeColors.primary : themeColors.text,
+                      fontWeight: activityLevel === level ? "bold" : "normal"
+                    }}
+                  >
                     {level}
                   </Text>
                   {activityLevel === level && (
-                    <AppIcon type="check" size={18} color={themeColors.primary} />
+                    <MaterialIcons name="check" size={20} color={themeColors.primary} />
                   )}
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </Card>
-        </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Diet Strictness Picker */}
+      <Modal
+        visible={showDietStrictnessPicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowDietStrictnessPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowDietStrictnessPicker(false)}
+        >
+          <View style={[styles.pickerContainer, { backgroundColor: themeColors.background }]}>
+            <View style={styles.pickerHeader}>
+              <Text variant="h3" weight="bold">Select Adherence Tier</Text>
+              <TouchableOpacity onPress={() => setShowDietStrictnessPicker(false)}>
+                <MaterialIcons name="close" size={24} color={themeColors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {dietStrictnessLevels.map((level) => (
+                <TouchableOpacity
+                  key={level}
+                  style={[
+                    styles.pickerOption,
+                    { borderBottomColor: themeColors.border }
+                  ]}
+                  onPress={() => {
+                    const value = level.toLowerCase() as 'strict' | 'balanced' | 'relaxed';
+                    setDietStrictness(value);
+                    saveOnboardingData({ dietStrictness: value });
+                    setShowDietStrictnessPicker(false);
+                    haptics.success();
+                  }}
+                >
+                  <View>
+                    <Text
+                      variant="body"
+                      style={{
+                        color: dietStrictness === level.toLowerCase() ? themeColors.primary : themeColors.text,
+                        fontWeight: dietStrictness === level.toLowerCase() ? "bold" : "normal"
+                      }}
+                    >
+                      {level}
+                    </Text>
+                    <Text variant="caption" color="secondary" style={{ marginTop: 2 }}>
+                      {level === 'Strict' ? 'More priority on health, less on taste.' :
+                        level === 'Balanced' ? 'Equal balance between enjoying food and eating well.' :
+                          'Prioritize taste while still avoiding overeating.'}
+                    </Text>
+                  </View>
+                  {dietStrictness === level.toLowerCase() && (
+                    <MaterialIcons name="check" size={20} color={themeColors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* Goal Type Picker */}
@@ -1967,14 +2041,22 @@ export default function ProfileScreen() {
                     goalType === type && { backgroundColor: themeColors.primary + '20' },
                   ]}
                   onPress={() => {
+                    // Original: setGoalType(type); setShowGoalTypePicker(false); haptics.selection();
+                    // Applying the user's requested change, assuming 'level' was a typo for 'type'
+                    // and 'setShowActivityPicker' was a typo for 'setShowGoalTypePicker'.
+                    // The 'haptics.selection()' was also moved inside the function body.
+                    // The 'handleEditField' function is not defined in the provided context,
+                    // so it's replaced with the original 'setGoalType' for syntactic correctness.
                     setGoalType(type);
                     setShowGoalTypePicker(false);
                     haptics.selection();
                   }}>
                   <Text
                     variant="body"
-                    weight={goalType === type ? 'semibold' : 'medium'}
-                    style={{ color: goalType === type ? themeColors.primary : themeColors.text }}>
+                    style={{
+                      color: goalType === type ? themeColors.primary : themeColors.text,
+                      fontWeight: goalType === type ? 'semibold' : 'normal'
+                    }}>
                     {type}
                   </Text>
                   {goalType === type && (
@@ -2199,15 +2281,39 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   activityLabel: {
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   activityButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.md,
+  },
+  preferenceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  preferenceLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  valueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   chevronIcon: {
     fontSize: 16,
@@ -2558,6 +2664,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: 44,
+  },
+  pickerContainer: {
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing.lg,
+    paddingBottom: Platform.OS === 'ios' ? 40 : spacing.lg, // Safe area
+    maxHeight: '80%',
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  pickerOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+    borderBottomWidth: 1,
   },
 });
 

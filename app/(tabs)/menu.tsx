@@ -141,7 +141,7 @@ export default function MenuScreen() {
 
   // Separate dining halls into categories (open/opening soon and closed)
   // "Opening Soon" halls (within 30 min) appear with open halls for better UX
-  // Hill locations: BPlate, Epicuria, De Neve, Feast, Drey, Bruin Cafe, Rendezvous, The Study, Cafe 1919
+  // Hill locations: Bruin Plate, Epicuria, De Neve, Feast, Drey, Bruin Cafe, Rendezvous, The Study, Cafe 1919
   const openHillLocations = useMemo(
     () => sortedHalls.filter(h => isHillLocation(h) && !isLuvalleLocation(h) && (h.is_open_now || isOpeningSoon(h))),
     [sortedHalls]
