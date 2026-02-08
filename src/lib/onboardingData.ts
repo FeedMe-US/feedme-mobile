@@ -188,6 +188,7 @@ export function onboardingDataToProfile(data: OnboardingData) {
     preferred_locations: preferredLocationIds,
     meals_per_day: data.mealsPerDay,
     meal_times: mealTimes,
+    macro_adherence_tier: data.dietStrictness,  // 'strict' | 'balanced' | 'relaxed'
   };
 }
 
