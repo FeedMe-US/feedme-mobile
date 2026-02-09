@@ -232,8 +232,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   // Sign in with Google OAuth
   signInWithGoogle: async () => {
     const result = await authService.signInWithGoogle();
-    // The OAuth callback will handle session creation
-    // The auth state listener will detect the SIGNED_IN event and refresh user
+
+    // If successful, refresh user profile to update auth state
+    // This is needed because the auth listener's refreshUser() runs before
+    // completeRegistration() creates the user in our DB
+    if (result.success) {
+      await get().refreshUser();
+    }
+
     return result;
   },
 
