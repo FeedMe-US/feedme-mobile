@@ -25,15 +25,18 @@ import { Button } from '@/src/ui/Button';
 import { useAuthStore } from '@/src/store/authStore';
 import { haptics } from '@/src/utils/haptics';
 import { University } from '@/src/services/authService';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SignupScreen() {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'dark'];
   const router = useRouter();
   const signUp = useAuthStore((s) => s.signUp);
+  const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
   const checkEmail = useAuthStore((s) => s.checkEmail);
 
   const [step, setStep] = useState<'email' | 'password'>('email');
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -124,6 +127,27 @@ export default function SignupScreen() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    haptics.light();
+
+    try {
+      const result = await signInWithGoogle();
+
+      if (result.success) {
+        haptics.success();
+        // The auth callback will handle session and redirect to onboarding
+      } else if (result.error && result.error !== 'Sign in was cancelled') {
+        Alert.alert('Sign In Failed', result.error);
+        haptics.error();
+      }
+    } catch (_error) {
+      Alert.alert('Error', 'Failed to sign in with Google. Please try again.');
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
   return (
     <Screen>
       <KeyboardAvoidingView
@@ -197,6 +221,38 @@ export default function SignupScreen() {
                     style={styles.button}>
                     {isLoading ? <ActivityIndicator color="#fff" /> : 'Continue'}
                   </Button>
+
+                  {/* Divider */}
+                  <View style={styles.divider}>
+                    <View style={[styles.dividerLine, { backgroundColor: themeColors.border }]} />
+                    <Text variant="caption" color="secondary" style={styles.dividerText}>
+                      or
+                    </Text>
+                    <View style={[styles.dividerLine, { backgroundColor: themeColors.border }]} />
+                  </View>
+
+                  {/* Google Sign In */}
+                  <TouchableOpacity
+                    style={[
+                      styles.googleButton,
+                      {
+                        backgroundColor: themeColors.cardBackground,
+                        borderColor: themeColors.border,
+                      },
+                    ]}
+                    onPress={handleGoogleSignIn}
+                    disabled={isGoogleLoading || isLoading}>
+                    {isGoogleLoading ? (
+                      <ActivityIndicator color={themeColors.text} />
+                    ) : (
+                      <>
+                        <Ionicons name="logo-google" size={20} color={themeColors.text} />
+                        <Text variant="body" style={styles.googleButtonText}>
+                          Continue with Google
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 </>
               ) : (
                 <>
@@ -357,6 +413,30 @@ const styles = StyleSheet.create({
   },
   signupButton: {
     flex: 2,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing.md,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    marginHorizontal: spacing.md,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 52,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    gap: spacing.sm,
+  },
+  googleButtonText: {
+    marginLeft: spacing.xs,
   },
   footer: {
     flexDirection: 'row',

@@ -5,6 +5,7 @@
 
 import { supabase } from '@/src/lib/supabase';
 import { apiClient } from './api';
+import * as WebBrowser from 'expo-web-browser';
 
 // Types
 export interface University {
@@ -127,24 +128,52 @@ class AuthService {
 
   /**
    * Sign in with Google OAuth
+   * Uses expo-web-browser to open the OAuth flow on mobile
    */
   async signInWithGoogle(): Promise<{ success: boolean; error?: string }> {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: 'ucnutrition://auth/callback',
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
-      },
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
+    if (!supabase) {
+      return { success: false, error: 'Supabase not configured' };
     }
 
-    return { success: true };
+    try {
+      // Generate OAuth URL - skipBrowserRedirect is essential for React Native
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'ucnutrition://auth/callback',
+          skipBrowserRedirect: true, // Required for mobile - we handle browser ourselves
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data?.url) {
+        // Open OAuth flow in browser - this will redirect back via deep link
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          'ucnutrition://auth/callback'
+        );
+
+        // If user dismissed the browser, it's not an error - they may try again
+        if (result.type === 'cancel' || result.type === 'dismiss') {
+          return { success: false, error: 'Sign in was cancelled' };
+        }
+
+        // Success - the callback.tsx will handle the redirect and session
+        return { success: true };
+      }
+
+      return { success: false, error: 'No OAuth URL returned' };
+    } catch (error) {
+      console.error('[AuthService] Google OAuth error:', error);
+      return { success: false, error: 'Failed to start Google sign in' };
+    }
   }
 
   /**

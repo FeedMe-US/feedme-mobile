@@ -14,6 +14,7 @@ import { useAuthStore, useIsAuthenticated, useAuthLoading } from '@/src/store/au
 import { useResolvedTheme } from '@/src/store/themeStore';
 import { getOnboardingComplete, setOnboardingComplete } from '@/src/lib/onboarding';
 import { apiClient } from '@/src/services/api';
+import { logEnvironment } from '@/src/config/environment';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -246,8 +247,9 @@ function AppContent() {
 }
 
 export default function RootLayout() {
-  // Initialize auth store on mount
+  // Initialize auth store and log environment on mount
   useEffect(() => {
+    logEnvironment();
     useAuthStore.getState().initialize();
   }, []);
 

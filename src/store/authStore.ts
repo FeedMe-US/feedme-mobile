@@ -27,6 +27,7 @@ interface AuthActions {
   initialize: () => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   signInWithMagicLink: (email: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   checkEmail: (email: string) => Promise<{
@@ -224,6 +225,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       }
     }
 
+    return result;
+  },
+
+  // Sign in with Google OAuth
+  signInWithGoogle: async () => {
+    const result = await authService.signInWithGoogle();
+    // The OAuth callback will handle session creation
+    // The auth state listener will detect the SIGNED_IN event and refresh user
     return result;
   },
 
