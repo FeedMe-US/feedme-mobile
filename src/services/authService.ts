@@ -165,7 +165,52 @@ class AuthService {
           return { success: false, error: 'Sign in was cancelled' };
         }
 
-        // Success - the callback.tsx will handle the redirect and session
+        // Extract tokens from the callback URL
+        // Supabase returns tokens in the URL fragment: #access_token=xxx&refresh_token=yyy
+        if (result.type === 'success' && result.url) {
+          const url = result.url;
+          let accessToken: string | null = null;
+          let refreshToken: string | null = null;
+
+          // Parse tokens from URL fragment (hash)
+          if (url.includes('#')) {
+            const fragment = url.split('#')[1];
+            if (fragment) {
+              const params = new URLSearchParams(fragment);
+              accessToken = params.get('access_token');
+              refreshToken = params.get('refresh_token');
+            }
+          }
+
+          // If we got tokens, set the session
+          if (accessToken && refreshToken) {
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+
+            if (sessionError) {
+              console.error('[AuthService] Failed to set session:', sessionError);
+              return { success: false, error: sessionError.message };
+            }
+
+            // Complete registration with backend (creates user record)
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user?.email) {
+              const registration = await this.completeRegistration(user.email);
+              if (registration.error) {
+                // Don't fail OAuth - user can still be authenticated
+                // Registration error likely means non-university email
+                console.warn('[AuthService] Registration warning:', registration.error);
+                return { success: false, error: registration.error };
+              }
+            }
+
+            return { success: true };
+          }
+        }
+
+        // Fallback: if no tokens in URL, callback.tsx might handle it
         return { success: true };
       }
 
