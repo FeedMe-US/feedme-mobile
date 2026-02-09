@@ -4,10 +4,32 @@
     "title": "FeedMe API",
     "description": "UCLA dining recommendation engine API",
     "version": "1.0.0",
-    "x-generated-at": "2026-01-22T01:08:59.308671",
+    "x-generated-at": "2026-02-09T04:23:11.570155",
     "x-generator": "export_openapi.py"
   },
   "paths": {
+    "/metrics": {
+      "get": {
+        "summary": "Metrics",
+        "description": "Endpoint that serves Prometheus metrics.",
+        "operationId": "metrics_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -280,7 +302,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserProfileResponse"
+                  "$ref": "#/components/schemas/src__schemas__user__UserProfileResponse"
                 }
               }
             }
@@ -315,7 +337,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserProfileResponse"
+                  "$ref": "#/components/schemas/src__schemas__user__UserProfileResponse"
                 }
               }
             }
@@ -580,6 +602,53 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/user/onboarding/taste-profile": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Set Taste Profile",
+        "description": "Set initial taste profile during onboarding.\n\nConverts slider values (-5 to +5) to food keywords that are used\nto boost affinity scores for matching menu items during recommendation.\n\nThis is part of the cold start system - new users answer these questions\nduring onboarding, and the keywords help personalize recommendations\nbefore they have any food interaction history.\n\nArgs:\n    request: TasteProfileRequest with 5 slider values\n\nReturns:\n    TasteProfileResponse with extracted keywords and confirmation",
+        "operationId": "set_taste_profile_user_onboarding_taste_profile_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TasteProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TasteProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1112,6 +1181,100 @@
         }
       }
     },
+    "/scan/correct": {
+      "post": {
+        "tags": [
+          "scan"
+        ],
+        "summary": "Log Food Correction",
+        "description": "Log a correction when the AI misidentifies a food item.\n\nThis helps improve the CalAI system by:\n1. Building a database of common misidentifications\n2. Enabling prompt refinement based on real errors\n3. Providing data for potential model fine-tuning\n\nThe correction is stored with the original photo reference for analysis.",
+        "operationId": "log_food_correction_scan_correct_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FoodCorrectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodCorrectionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/scan/describe": {
+      "post": {
+        "tags": [
+          "scan"
+        ],
+        "summary": "Describe Food For Estimation",
+        "description": "Re-analyze a food photo with user's description when AI fails.\n\nWhen the initial photo recognition fails or gives wrong results,\nusers can provide their own description. The AI then:\n1. Verifies the description against the image\n2. Extracts a searchable food name\n3. Looks up nutrition in USDA (most accurate)\n4. Falls back to AI estimation if USDA doesn't have it\n\nThe response indicates whether nutrition came from USDA or AI.\nAI estimates have lower confidence and should show a disclaimer.\n\nRate limit: Shares the 10/day photo AI limit.",
+        "operationId": "describe_food_for_estimation_scan_describe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FoodDescribeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodDescribeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/auth/check-email": {
       "post": {
         "tags": [
@@ -1248,6 +1411,33 @@
             }
           }
         }
+      }
+    },
+    "/auth/account": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Delete Account",
+        "description": "Delete user account and all associated data.\n\nThis endpoint:\n1. Deletes all user data from our database (cascades via FK)\n2. Note: Supabase auth user remains but is orphaned (requires admin SDK to fully delete)",
+        "operationId": "delete_account_auth_account_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteAccountResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/food/search": {
@@ -1444,6 +1634,49 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/data-health": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Check scraper data freshness",
+        "description": "Verify the scraper is populating data correctly.\n\n    Returns:\n    - hours_today_count: Number of locations with hours for today\n    - menu_today_count: Number of menu items for today\n    - status: \"healthy\" (data present), \"warning\" (stale), \"critical\" (missing)\n    - issues: List of specific problems detected\n\n    Use this endpoint to monitor scraper health and set up alerts.",
+        "operationId": "data_health_admin_data_health_get",
+        "parameters": [
+          {
+            "name": "X-Admin-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "X-Admin-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataHealthResponse"
+                }
               }
             }
           },
@@ -2065,6 +2298,14 @@
           "totals": {
             "$ref": "#/components/schemas/DailyTotals",
             "description": "Consumed, remaining, and target macros"
+          },
+          "micronutrients": {
+            "items": {
+              "$ref": "#/components/schemas/MicronutrientProgress"
+            },
+            "type": "array",
+            "title": "Micronutrients",
+            "description": "Progress for user's tracked micronutrients"
           }
         },
         "type": "object",
@@ -2074,6 +2315,58 @@
         ],
         "title": "DailyTrackingResponse",
         "description": "Response for GET /log - full daily tracking data."
+      },
+      "DataHealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "hours_status": {
+            "type": "string",
+            "title": "Hours Status"
+          },
+          "hours_today_count": {
+            "type": "integer",
+            "title": "Hours Today Count"
+          },
+          "hours_yesterday_count": {
+            "type": "integer",
+            "title": "Hours Yesterday Count"
+          },
+          "menu_status": {
+            "type": "string",
+            "title": "Menu Status"
+          },
+          "menu_today_count": {
+            "type": "integer",
+            "title": "Menu Today Count"
+          },
+          "menu_yesterday_count": {
+            "type": "integer",
+            "title": "Menu Yesterday Count"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "hours_status",
+          "hours_today_count",
+          "hours_yesterday_count",
+          "menu_status",
+          "menu_today_count",
+          "menu_yesterday_count",
+          "issues"
+        ],
+        "title": "DataHealthResponse",
+        "description": "Response for data health check."
       },
       "DayPlanResponse": {
         "properties": {
@@ -2120,6 +2413,25 @@
         ],
         "title": "DayProgressResponse",
         "description": "Progress metrics for the day."
+      },
+      "DeleteAccountResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "DeleteAccountResponse",
+        "description": "Response from account deletion."
       },
       "EmailCheckRequest": {
         "properties": {
@@ -2268,6 +2580,183 @@
         ],
         "title": "FoodAIResponse",
         "description": "Response from food AI photo recognition endpoint."
+      },
+      "FoodCorrectionRequest": {
+        "properties": {
+          "photo_url": {
+            "type": "string",
+            "title": "Photo Url",
+            "description": "URL of the photo that was analyzed"
+          },
+          "original_food": {
+            "type": "string",
+            "title": "Original Food",
+            "description": "What the AI identified"
+          },
+          "corrected_food": {
+            "type": "string",
+            "title": "Corrected Food",
+            "description": "What the food actually is"
+          },
+          "original_confidence": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Confidence",
+            "description": "AI's confidence in the wrong identification"
+          },
+          "ai_reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Reasoning",
+            "description": "The AI's reasoning for its identification"
+          },
+          "user_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Notes",
+            "description": "Optional user feedback about the error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "photo_url",
+          "original_food",
+          "corrected_food"
+        ],
+        "title": "FoodCorrectionRequest",
+        "description": "Request to correct a misidentified food item."
+      },
+      "FoodCorrectionResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether correction was logged"
+          },
+          "correction_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Id",
+            "description": "ID of the logged correction"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Status message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "FoodCorrectionResponse",
+        "description": "Response after logging a food correction."
+      },
+      "FoodDescribeRequest": {
+        "properties": {
+          "photo_url": {
+            "type": "string",
+            "title": "Photo Url",
+            "description": "URL of the photo to re-analyze"
+          },
+          "user_description": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "User Description",
+            "description": "User's description of the food (e.g., 'tofu stir fry with vegetables')"
+          },
+          "estimated_serving": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Serving",
+            "description": "User's estimate of serving size (e.g., '1 cup', '6 oz')"
+          }
+        },
+        "type": "object",
+        "required": [
+          "photo_url",
+          "user_description"
+        ],
+        "title": "FoodDescribeRequest",
+        "description": "Request to describe food when AI identification fails."
+      },
+      "FoodDescribeResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether estimation succeeded"
+          },
+          "item": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FoodAIItem"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Estimated food with nutrition"
+          },
+          "nutrition_source": {
+            "type": "string",
+            "title": "Nutrition Source",
+            "description": "Where nutrition data came from: 'usda' or 'ai_estimate'"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message if failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "nutrition_source"
+        ],
+        "title": "FoodDescribeResponse",
+        "description": "Response with nutrition estimates based on user description + image."
       },
       "FoodLogEntry": {
         "properties": {
@@ -2764,6 +3253,21 @@
               }
             ],
             "title": "Area Type"
+          },
+          "station": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "east",
+                  "west"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Station"
           }
         },
         "type": "object",
@@ -3162,6 +3666,26 @@
             },
             "type": "array",
             "title": "Allergens"
+          },
+          "is_byo_item": {
+            "type": "boolean",
+            "title": "Is Byo Item",
+            "default": false
+          },
+          "station": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "east",
+                  "west"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Station"
           },
           "serving_size": {
             "anyOf": [
@@ -3584,6 +4108,57 @@
         "title": "MenuSectionResponse",
         "description": "Section of a menu (e.g., \"The Grill\")."
       },
+      "MicronutrientProgress": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Micronutrient key (e.g., 'vitamin_d_mcg')"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "Human-readable name (e.g., 'Vitamin D')"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "description": "Unit of measurement (e.g., 'mcg')"
+          },
+          "consumed": {
+            "type": "number",
+            "title": "Consumed",
+            "description": "Amount consumed today"
+          },
+          "target": {
+            "type": "number",
+            "title": "Target",
+            "description": "Daily target"
+          },
+          "remaining": {
+            "type": "number",
+            "title": "Remaining",
+            "description": "Remaining (target - consumed, min 0)"
+          },
+          "pct": {
+            "type": "integer",
+            "title": "Pct",
+            "description": "Percentage of target consumed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "display_name",
+          "unit",
+          "consumed",
+          "target",
+          "remaining",
+          "pct"
+        ],
+        "title": "MicronutrientProgress",
+        "description": "Progress for a single tracked micronutrient."
+      },
       "PlateItemResponse": {
         "properties": {
           "recipe_id": {
@@ -3927,6 +4502,22 @@
             ],
             "title": "Area",
             "description": "Area filter for 'any hall' mode"
+          },
+          "station": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "east",
+                  "west"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Station",
+            "description": "For Rendezvous (ID 39): 'east' for Asian, 'west' for Latin"
           }
         },
         "type": "object",
@@ -4011,6 +4602,82 @@
         ],
         "title": "TargetsResponse",
         "description": "Response for GET /user/targets."
+      },
+      "TasteProfileRequest": {
+        "properties": {
+          "comfort_food": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": -5.0,
+            "title": "Comfort Food",
+            "description": "Western comfort food (-5) vs global cuisines (+5)"
+          },
+          "spice_tolerance": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": -5.0,
+            "title": "Spice Tolerance",
+            "description": "Mild (-5) vs spicy (+5)"
+          },
+          "meal_style": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": -5.0,
+            "title": "Meal Style",
+            "description": "Classic/simple (-5) vs adventurous/complex (+5)"
+          },
+          "variety_seeking": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": -5.0,
+            "title": "Variety Seeking",
+            "description": "Familiar favorites (-5) vs try new things (+5)"
+          },
+          "texture_preference": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": -5.0,
+            "title": "Texture Preference",
+            "description": "Soft/smooth (-5) vs crunchy/crispy (+5)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "comfort_food",
+          "spice_tolerance",
+          "meal_style",
+          "variety_seeking",
+          "texture_preference"
+        ],
+        "title": "TasteProfileRequest",
+        "description": "Request body for POST /user/onboarding/taste-profile.\n\nEach field is a slider from -5 to +5 representing food preferences.\nThese map to food keywords that boost affinity for matching menu items.\n\nExamples:\n    comfort_food: -5 = burgers, pizza; +5 = curry, pho, sushi\n    spice_tolerance: -5 = mild, plain; +5 = spicy, buffalo, sriracha"
+      },
+      "TasteProfileResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "keywords",
+          "message"
+        ],
+        "title": "TasteProfileResponse",
+        "description": "Response for POST /user/onboarding/taste-profile."
       },
       "ThumbsUpRequest": {
         "properties": {
@@ -4170,184 +4837,6 @@
         "title": "UniversityInfo",
         "description": "University information returned from detection."
       },
-      "UserProfileResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "email": {
-            "type": "string",
-            "title": "Email"
-          },
-          "age": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Age"
-          },
-          "sex": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "male",
-                  "female"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sex"
-          },
-          "height_inches": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Height Inches"
-          },
-          "weight_lbs": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Weight Lbs"
-          },
-          "activity_level": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Activity Level"
-          },
-          "goal_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Goal Type"
-          },
-          "dietary_restrictions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Dietary Restrictions"
-          },
-          "allergen_exclusions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Allergen Exclusions"
-          },
-          "preferred_locations": {
-            "items": {
-              "type": "integer"
-            },
-            "type": "array",
-            "title": "Preferred Locations"
-          },
-          "onboarding_complete": {
-            "type": "boolean",
-            "title": "Onboarding Complete",
-            "default": false
-          },
-          "targets": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserTargetsResponse"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "meal_pattern": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/MealPatternResponse"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "macros_custom_override": {
-            "type": "boolean",
-            "title": "Macros Custom Override",
-            "default": false
-          },
-          "carb_fat_ratio": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Carb Fat Ratio"
-          },
-          "protein_locked": {
-            "type": "boolean",
-            "title": "Protein Locked",
-            "default": true
-          },
-          "protein_multiplier": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Protein Multiplier"
-          },
-          "created_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "email"
-        ],
-        "title": "UserProfileResponse",
-        "description": "Response for GET /user/profile."
-      },
       "UserProfileUpdateRequest": {
         "properties": {
           "age": {
@@ -4473,6 +4962,20 @@
             ],
             "title": "Preferred Locations"
           },
+          "tracked_micronutrients": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracked Micronutrients"
+          },
           "onboarding_complete": {
             "anyOf": [
               {
@@ -4596,6 +5099,22 @@
               }
             ],
             "title": "Protein Multiplier"
+          },
+          "macro_adherence_tier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "strict",
+                  "balanced",
+                  "relaxed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Macro Adherence Tier"
           }
         },
         "type": "object",
@@ -4654,6 +5173,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -4940,9 +5466,214 @@
         ],
         "title": "UserProfileResponse",
         "description": "User profile with university info."
+      },
+      "src__schemas__user__UserProfileResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "age": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "sex": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "male",
+                  "female"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sex"
+          },
+          "height_inches": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Inches"
+          },
+          "weight_lbs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Lbs"
+          },
+          "activity_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Level"
+          },
+          "goal_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goal Type"
+          },
+          "dietary_restrictions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dietary Restrictions"
+          },
+          "allergen_exclusions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allergen Exclusions"
+          },
+          "preferred_locations": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Preferred Locations"
+          },
+          "tracked_micronutrients": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tracked Micronutrients"
+          },
+          "onboarding_complete": {
+            "type": "boolean",
+            "title": "Onboarding Complete",
+            "default": false
+          },
+          "targets": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserTargetsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meal_pattern": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MealPatternResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "macros_custom_override": {
+            "type": "boolean",
+            "title": "Macros Custom Override",
+            "default": false
+          },
+          "carb_fat_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carb Fat Ratio"
+          },
+          "protein_locked": {
+            "type": "boolean",
+            "title": "Protein Locked",
+            "default": true
+          },
+          "protein_multiplier": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Multiplier"
+          },
+          "macro_adherence_tier": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "strict",
+                  "balanced",
+                  "relaxed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Macro Adherence Tier"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email"
+        ],
+        "title": "UserProfileResponse",
+        "description": "Response for GET /user/profile."
       }
     },
     "securitySchemes": {
+      "HTTPBasic": {
+        "type": "http",
+        "scheme": "basic"
+      },
       "HTTPBearer": {
         "type": "http",
         "scheme": "bearer"
