@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Metrics
+         * @description Endpoint that serves Prometheus metrics.
+         */
+        get: operations["metrics_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -318,6 +338,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/user/onboarding/taste-profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Taste Profile
+         * @description Set initial taste profile during onboarding.
+         *
+         *     Converts slider values (-5 to +5) to food keywords that are used
+         *     to boost affinity scores for matching menu items during recommendation.
+         *
+         *     This is part of the cold start system - new users answer these questions
+         *     during onboarding, and the keywords help personalize recommendations
+         *     before they have any food interaction history.
+         *
+         *     Args:
+         *         request: TasteProfileRequest with 5 slider values
+         *
+         *     Returns:
+         *         TasteProfileResponse with extracted keywords and confirmation
+         */
+        post: operations["set_taste_profile_user_onboarding_taste_profile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/recommend": {
         parameters: {
             query?: never;
@@ -541,6 +594,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/scan/correct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log Food Correction
+         * @description Log a correction when the AI misidentifies a food item.
+         *
+         *     This helps improve the CalAI system by:
+         *     1. Building a database of common misidentifications
+         *     2. Enabling prompt refinement based on real errors
+         *     3. Providing data for potential model fine-tuning
+         *
+         *     The correction is stored with the original photo reference for analysis.
+         */
+        post: operations["log_food_correction_scan_correct_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/scan/describe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Describe Food For Estimation
+         * @description Re-analyze a food photo with user's description when AI fails.
+         *
+         *     When the initial photo recognition fails or gives wrong results,
+         *     users can provide their own description. The AI then:
+         *     1. Verifies the description against the image
+         *     2. Extracts a searchable food name
+         *     3. Looks up nutrition in USDA (most accurate)
+         *     4. Falls back to AI estimation if USDA doesn't have it
+         *
+         *     The response indicates whether nutrition came from USDA or AI.
+         *     AI estimates have lower confidence and should show a disclaimer.
+         *
+         *     Rate limit: Shares the 10/day photo AI limit.
+         */
+        post: operations["describe_food_for_estimation_scan_describe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/check-email": {
         parameters: {
             query?: never;
@@ -623,6 +735,30 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Account
+         * @description Delete user account and all associated data.
+         *
+         *     This endpoint:
+         *     1. Deletes all user data from our database (cascades via FK)
+         *     2. Note: Supabase auth user remains but is orphaned (requires admin SDK to fully delete)
+         */
+        delete: operations["delete_account_auth_account_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -717,6 +853,34 @@ export interface paths {
          * @description Check if admin endpoints are configured and accessible.
          */
         get: operations["admin_health_admin_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/data-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check scraper data freshness
+         * @description Verify the scraper is populating data correctly.
+         *
+         *         Returns:
+         *         - hours_today_count: Number of locations with hours for today
+         *         - menu_today_count: Number of menu items for today
+         *         - status: "healthy" (data present), "warning" (stale), "critical" (missing)
+         *         - issues: List of specific problems detected
+         *
+         *         Use this endpoint to monitor scraper health and set up alerts.
+         */
+        get: operations["data_health_admin_data_health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1054,6 +1218,33 @@ export interface components {
             entries?: components["schemas"]["FoodLogEntry"][];
             /** @description Consumed, remaining, and target macros */
             totals: components["schemas"]["DailyTotals"];
+            /**
+             * Micronutrients
+             * @description Progress for user's tracked micronutrients
+             */
+            micronutrients?: components["schemas"]["MicronutrientProgress"][];
+        };
+        /**
+         * DataHealthResponse
+         * @description Response for data health check.
+         */
+        DataHealthResponse: {
+            /** Status */
+            status: string;
+            /** Hours Status */
+            hours_status: string;
+            /** Hours Today Count */
+            hours_today_count: number;
+            /** Hours Yesterday Count */
+            hours_yesterday_count: number;
+            /** Menu Status */
+            menu_status: string;
+            /** Menu Today Count */
+            menu_today_count: number;
+            /** Menu Yesterday Count */
+            menu_yesterday_count: number;
+            /** Issues */
+            issues: string[];
         };
         /**
          * DayPlanResponse
@@ -1078,6 +1269,16 @@ export interface components {
             protein_g: components["schemas"]["ProgressMetric"];
             carbs_g: components["schemas"]["ProgressMetric"];
             fat_g: components["schemas"]["ProgressMetric"];
+        };
+        /**
+         * DeleteAccountResponse
+         * @description Response from account deletion.
+         */
+        DeleteAccountResponse: {
+            /** Success */
+            success: boolean;
+            /** Message */
+            message: string;
         };
         /**
          * EmailCheckRequest
@@ -1162,6 +1363,107 @@ export interface components {
              * @description URL of the uploaded photo in storage
              */
             photo_url?: string | null;
+            /**
+             * Error
+             * @description Error message if failed
+             */
+            error?: string | null;
+        };
+        /**
+         * FoodCorrectionRequest
+         * @description Request to correct a misidentified food item.
+         */
+        FoodCorrectionRequest: {
+            /**
+             * Photo Url
+             * @description URL of the photo that was analyzed
+             */
+            photo_url: string;
+            /**
+             * Original Food
+             * @description What the AI identified
+             */
+            original_food: string;
+            /**
+             * Corrected Food
+             * @description What the food actually is
+             */
+            corrected_food: string;
+            /**
+             * Original Confidence
+             * @description AI's confidence in the wrong identification
+             */
+            original_confidence?: number | null;
+            /**
+             * Ai Reasoning
+             * @description The AI's reasoning for its identification
+             */
+            ai_reasoning?: string | null;
+            /**
+             * User Notes
+             * @description Optional user feedback about the error
+             */
+            user_notes?: string | null;
+        };
+        /**
+         * FoodCorrectionResponse
+         * @description Response after logging a food correction.
+         */
+        FoodCorrectionResponse: {
+            /**
+             * Success
+             * @description Whether correction was logged
+             */
+            success: boolean;
+            /**
+             * Correction Id
+             * @description ID of the logged correction
+             */
+            correction_id?: string | null;
+            /**
+             * Message
+             * @description Status message
+             */
+            message: string;
+        };
+        /**
+         * FoodDescribeRequest
+         * @description Request to describe food when AI identification fails.
+         */
+        FoodDescribeRequest: {
+            /**
+             * Photo Url
+             * @description URL of the photo to re-analyze
+             */
+            photo_url: string;
+            /**
+             * User Description
+             * @description User's description of the food (e.g., 'tofu stir fry with vegetables')
+             */
+            user_description: string;
+            /**
+             * Estimated Serving
+             * @description User's estimate of serving size (e.g., '1 cup', '6 oz')
+             */
+            estimated_serving?: string | null;
+        };
+        /**
+         * FoodDescribeResponse
+         * @description Response with nutrition estimates based on user description + image.
+         */
+        FoodDescribeResponse: {
+            /**
+             * Success
+             * @description Whether estimation succeeded
+             */
+            success: boolean;
+            /** @description Estimated food with nutrition */
+            item?: components["schemas"]["FoodAIItem"] | null;
+            /**
+             * Nutrition Source
+             * @description Where nutrition data came from: 'usda' or 'ai_estimate'
+             */
+            nutrition_source: string;
             /**
              * Error
              * @description Error message if failed
@@ -1396,6 +1698,8 @@ export interface components {
             is_all_day: boolean;
             /** Area Type */
             area_type?: ("hill" | "campus") | null;
+            /** Station */
+            station?: ("east" | "west") | null;
         };
         /**
          * LocationsResponse
@@ -1567,6 +1871,13 @@ export interface components {
             tags: string[];
             /** Allergens */
             allergens: string[];
+            /**
+             * Is Byo Item
+             * @default false
+             */
+            is_byo_item: boolean;
+            /** Station */
+            station?: ("east" | "west") | null;
             /** Serving Size */
             serving_size?: string | null;
             /** Fiber G */
@@ -1702,6 +2013,47 @@ export interface components {
             name: string;
             /** Items */
             items: components["schemas"]["MenuItemResponse"][];
+        };
+        /**
+         * MicronutrientProgress
+         * @description Progress for a single tracked micronutrient.
+         */
+        MicronutrientProgress: {
+            /**
+             * Key
+             * @description Micronutrient key (e.g., 'vitamin_d_mcg')
+             */
+            key: string;
+            /**
+             * Display Name
+             * @description Human-readable name (e.g., 'Vitamin D')
+             */
+            display_name: string;
+            /**
+             * Unit
+             * @description Unit of measurement (e.g., 'mcg')
+             */
+            unit: string;
+            /**
+             * Consumed
+             * @description Amount consumed today
+             */
+            consumed: number;
+            /**
+             * Target
+             * @description Daily target
+             */
+            target: number;
+            /**
+             * Remaining
+             * @description Remaining (target - consumed, min 0)
+             */
+            remaining: number;
+            /**
+             * Pct
+             * @description Percentage of target consumed
+             */
+            pct: number;
         };
         /**
          * PlateItemResponse
@@ -1865,6 +2217,11 @@ export interface components {
              * @description Area filter for 'any hall' mode
              */
             area?: ("hill" | "campus") | null;
+            /**
+             * Station
+             * @description For Rendezvous (ID 39): 'east' for Asian, 'west' for Latin
+             */
+            station?: ("east" | "west") | null;
         };
         /**
          * RecommendResponse
@@ -1903,6 +2260,56 @@ export interface components {
             adjustment: components["schemas"]["AdjustmentInfo"];
             week_summary: components["schemas"]["WeekSummaryResponse"];
             today_progress: components["schemas"]["TodayProgressResponse"];
+        };
+        /**
+         * TasteProfileRequest
+         * @description Request body for POST /user/onboarding/taste-profile.
+         *
+         *     Each field is a slider from -5 to +5 representing food preferences.
+         *     These map to food keywords that boost affinity for matching menu items.
+         *
+         *     Examples:
+         *         comfort_food: -5 = burgers, pizza; +5 = curry, pho, sushi
+         *         spice_tolerance: -5 = mild, plain; +5 = spicy, buffalo, sriracha
+         */
+        TasteProfileRequest: {
+            /**
+             * Comfort Food
+             * @description Western comfort food (-5) vs global cuisines (+5)
+             */
+            comfort_food: number;
+            /**
+             * Spice Tolerance
+             * @description Mild (-5) vs spicy (+5)
+             */
+            spice_tolerance: number;
+            /**
+             * Meal Style
+             * @description Classic/simple (-5) vs adventurous/complex (+5)
+             */
+            meal_style: number;
+            /**
+             * Variety Seeking
+             * @description Familiar favorites (-5) vs try new things (+5)
+             */
+            variety_seeking: number;
+            /**
+             * Texture Preference
+             * @description Soft/smooth (-5) vs crunchy/crispy (+5)
+             */
+            texture_preference: number;
+        };
+        /**
+         * TasteProfileResponse
+         * @description Response for POST /user/onboarding/taste-profile.
+         */
+        TasteProfileResponse: {
+            /** Success */
+            success: boolean;
+            /** Keywords */
+            keywords: string[];
+            /** Message */
+            message: string;
         };
         /**
          * ThumbsUpRequest
@@ -1985,57 +2392,6 @@ export interface components {
             is_supported: boolean;
         };
         /**
-         * UserProfileResponse
-         * @description Response for GET /user/profile.
-         */
-        UserProfileResponse: {
-            /** Id */
-            id: string;
-            /** Email */
-            email: string;
-            /** Age */
-            age?: number | null;
-            /** Sex */
-            sex?: ("male" | "female") | null;
-            /** Height Inches */
-            height_inches?: number | null;
-            /** Weight Lbs */
-            weight_lbs?: number | null;
-            /** Activity Level */
-            activity_level?: string | null;
-            /** Goal Type */
-            goal_type?: string | null;
-            /** Dietary Restrictions */
-            dietary_restrictions?: string[];
-            /** Allergen Exclusions */
-            allergen_exclusions?: string[];
-            /** Preferred Locations */
-            preferred_locations?: number[];
-            /**
-             * Onboarding Complete
-             * @default false
-             */
-            onboarding_complete: boolean;
-            targets?: components["schemas"]["UserTargetsResponse"] | null;
-            meal_pattern?: components["schemas"]["MealPatternResponse"] | null;
-            /**
-             * Macros Custom Override
-             * @default false
-             */
-            macros_custom_override: boolean;
-            /** Carb Fat Ratio */
-            carb_fat_ratio?: number | null;
-            /**
-             * Protein Locked
-             * @default true
-             */
-            protein_locked: boolean;
-            /** Protein Multiplier */
-            protein_multiplier?: number | null;
-            /** Created At */
-            created_at?: string | null;
-        };
-        /**
          * UserProfileUpdateRequest
          * @description Request body for PUT /user/profile.
          */
@@ -2060,6 +2416,8 @@ export interface components {
             allergen_exclusions?: string[] | null;
             /** Preferred Locations */
             preferred_locations?: number[] | null;
+            /** Tracked Micronutrients */
+            tracked_micronutrients?: string[] | null;
             /** Onboarding Complete */
             onboarding_complete?: boolean | null;
             /** Meals Per Day */
@@ -2081,6 +2439,8 @@ export interface components {
             protein_locked?: boolean | null;
             /** Protein Multiplier */
             protein_multiplier?: number | null;
+            /** Macro Adherence Tier */
+            macro_adherence_tier?: ("strict" | "balanced" | "relaxed") | null;
         };
         /**
          * UserTargetsResponse
@@ -2104,6 +2464,10 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
         /**
          * WeekSummaryResponse
@@ -2217,6 +2581,61 @@ export interface components {
             /** University Name */
             university_name?: string | null;
         };
+        /**
+         * UserProfileResponse
+         * @description Response for GET /user/profile.
+         */
+        src__schemas__user__UserProfileResponse: {
+            /** Id */
+            id: string;
+            /** Email */
+            email: string;
+            /** Age */
+            age?: number | null;
+            /** Sex */
+            sex?: ("male" | "female") | null;
+            /** Height Inches */
+            height_inches?: number | null;
+            /** Weight Lbs */
+            weight_lbs?: number | null;
+            /** Activity Level */
+            activity_level?: string | null;
+            /** Goal Type */
+            goal_type?: string | null;
+            /** Dietary Restrictions */
+            dietary_restrictions?: string[];
+            /** Allergen Exclusions */
+            allergen_exclusions?: string[];
+            /** Preferred Locations */
+            preferred_locations?: number[];
+            /** Tracked Micronutrients */
+            tracked_micronutrients?: string[];
+            /**
+             * Onboarding Complete
+             * @default false
+             */
+            onboarding_complete: boolean;
+            targets?: components["schemas"]["UserTargetsResponse"] | null;
+            meal_pattern?: components["schemas"]["MealPatternResponse"] | null;
+            /**
+             * Macros Custom Override
+             * @default false
+             */
+            macros_custom_override: boolean;
+            /** Carb Fat Ratio */
+            carb_fat_ratio?: number | null;
+            /**
+             * Protein Locked
+             * @default true
+             */
+            protein_locked: boolean;
+            /** Protein Multiplier */
+            protein_multiplier?: number | null;
+            /** Macro Adherence Tier */
+            macro_adherence_tier?: ("strict" | "balanced" | "relaxed") | null;
+            /** Created At */
+            created_at?: string | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -2226,6 +2645,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    metrics_metrics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     health_check_health_get: {
         parameters: {
             query?: never;
@@ -2412,7 +2851,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserProfileResponse"];
+                    "application/json": components["schemas"]["src__schemas__user__UserProfileResponse"];
                 };
             };
         };
@@ -2436,7 +2875,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserProfileResponse"];
+                    "application/json": components["schemas"]["src__schemas__user__UserProfileResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2613,6 +3052,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    set_taste_profile_user_onboarding_taste_profile_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TasteProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TasteProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
@@ -2983,6 +3455,72 @@ export interface operations {
             };
         };
     };
+    log_food_correction_scan_correct_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FoodCorrectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodCorrectionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    describe_food_for_estimation_scan_describe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FoodDescribeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodDescribeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     check_email_auth_check_email_post: {
         parameters: {
             query?: never;
@@ -3085,6 +3623,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UniversitiesResponse"];
+                };
+            };
+        };
+    };
+    delete_account_auth_account_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteAccountResponse"];
                 };
             };
         };
@@ -3207,6 +3765,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    data_health_admin_data_health_get: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Admin-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataHealthResponse"];
                 };
             };
             /** @description Validation Error */
