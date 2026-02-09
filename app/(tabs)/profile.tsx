@@ -22,7 +22,7 @@ import { CarbFatSlider } from '@/src/components/CarbFatSlider';
 import { resetOnboarding } from '@/src/lib/onboarding';
 import { useRouter } from 'expo-router';
 import { getOnboardingData, saveOnboardingData } from '@/src/lib/onboardingData';
-import { useIsAuthenticated } from '@/src/store/authStore';
+import { useIsAuthenticated, useAuthStore } from '@/src/store/authStore';
 import { apiClient } from '@/src/services/api';
 import { userService } from '@/src/services/userService';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -36,8 +36,14 @@ export default function ProfileScreen() {
   const setAppearanceMode = useThemeStore((s) => s.setTheme);
   const router = useRouter();
   const isAuthenticated = useIsAuthenticated();
+  const signOut = useAuthStore((s) => s.signOut);
+  const deleteAccount = useAuthStore((s) => s.deleteAccount);
 
   const [userName, setUserName] = useState<string>('');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editNameValue, setEditNameValue] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [userEmail, setUserEmail] = useState<string>('');
   const [gender, setGender] = useState<'male' | 'female' | null>(null);
   const [showGenderPicker, setShowGenderPicker] = useState(false);
@@ -956,15 +962,85 @@ export default function ProfileScreen() {
             <View style={[styles.avatar, { backgroundColor: themeColors.cardBackgroundSecondary }]}>
               <AppIcon type="profile" size={24} />
             </View>
-            <View style={styles.userInfo}>
-              <Text variant="h4" weight="semibold">
-                {userName || 'User'}
-              </Text>
+            <TouchableOpacity
+              style={styles.userInfo}
+              onPress={() => {
+                setEditNameValue(userName || '');
+                setIsEditingName(true);
+              }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text variant="h4" weight="semibold">
+                  {userName || 'User'}
+                </Text>
+                <AppIcon type="edit" size={16} />
+              </View>
               <Text variant="bodySmall" color="secondary">
                 {userEmail || 'Loading...'}
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
+
+          {/* Display Name Edit Modal */}
+          <Modal
+            visible={isEditingName}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setIsEditingName(false)}>
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setIsEditingName(false)}>
+              <View
+                style={[styles.modalContent, { backgroundColor: themeColors.cardBackground }]}
+                onStartShouldSetResponder={() => true}>
+                <Text variant="h4" weight="semibold" style={{ marginBottom: 16 }}>
+                  Edit Display Name
+                </Text>
+                <TextInput
+                  style={[
+                    styles.modalInput,
+                    {
+                      backgroundColor: themeColors.cardBackgroundSecondary,
+                      color: themeColors.text,
+                      borderColor: themeColors.border,
+                    },
+                  ]}
+                  value={editNameValue}
+                  onChangeText={setEditNameValue}
+                  placeholder="Enter your name"
+                  placeholderTextColor={themeColors.textSecondary}
+                  autoFocus
+                />
+                <View style={styles.modalButtons}>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onPress={() => setIsEditingName(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    disabled={isSavingName}
+                    onPress={async () => {
+                      if (!editNameValue.trim()) return;
+                      setIsSavingName(true);
+                      const result = await userService.updateProfile({ display_name: editNameValue.trim() });
+                      setIsSavingName(false);
+                      if (result) {
+                        setUserName(editNameValue.trim());
+                        setIsEditingName(false);
+                        haptics.success();
+                      } else {
+                        Alert.alert('Error', 'Failed to update name');
+                      }
+                    }}>
+                    {isSavingName ? 'Saving...' : 'Save'}
+                  </Button>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
           {/* Gender Selection - Pill Buttons */}
           <View style={styles.genderSection}>
@@ -1693,7 +1769,17 @@ export default function ProfileScreen() {
               ]}
               onPress={() => {
                 haptics.medium();
-                Alert.alert('Log Out', 'Are you sure you want to log out?');
+                Alert.alert('Log Out', 'Are you sure you want to log out?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Log Out',
+                    style: 'destructive',
+                    onPress: async () => {
+                      await signOut();
+                      router.replace('/(auth)/select-school');
+                    },
+                  },
+                ]);
               }}>
               <Text variant="body" weight="semibold" style={{ color: themeColors.text }}>
                 Log Out
@@ -1709,13 +1795,32 @@ export default function ProfileScreen() {
               ]}
               onPress={() => {
                 haptics.medium();
-                Alert.alert('Delete Account', 'This action cannot be undone. Are you sure?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: () => {} },
-                ]);
-              }}>
+                Alert.alert(
+                  'Delete Account',
+                  'This will permanently delete your account and all data. This action cannot be undone.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: async () => {
+                        setIsDeletingAccount(true);
+                        const result = await deleteAccount();
+                        setIsDeletingAccount(false);
+
+                        if (result.success) {
+                          router.replace('/(auth)/select-school');
+                        } else {
+                          Alert.alert('Error', result.error || 'Failed to delete account');
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+              disabled={isDeletingAccount}>
               <Text variant="bodySmall" weight="semibold" style={{ color: themeColors.error }}>
-                Delete Account
+                {isDeletingAccount ? 'Deleting...' : 'Delete Account'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -2392,6 +2497,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 400,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    fontSize: 16,
+    marginBottom: spacing.lg,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    justifyContent: 'flex-end',
   },
   modalCard: {
     width: '100%',

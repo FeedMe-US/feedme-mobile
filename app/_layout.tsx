@@ -57,11 +57,11 @@ function AuthAndOnboardingGate({ children }: { children: React.ReactNode }) {
           const isTabsRoute = currentRoute === '(tabs)';
           const isAuthRoute = currentRoute === '(auth)';
 
-          // RULE 1: Not authenticated -> always go to login first
+          // RULE 1: Not authenticated -> always go to school picker first
           if (!isAuthenticated) {
-            console.log('[AuthGate] DEV - NOT authenticated, redirecting to login');
+            console.log('[AuthGate] DEV - NOT authenticated, redirecting to school picker');
             if (!isAuthRoute) {
-              router.replace('/(auth)/login');
+              router.replace('/(auth)/select-school');
             }
             setIsChecking(false);
             return;
@@ -116,12 +116,12 @@ function AuthAndOnboardingGate({ children }: { children: React.ReactNode }) {
         const isAuthRoute = currentRoute === '(auth)';
         const isOnboardingRoute = currentRoute === '(onboarding)';
 
-        // RULE 1: Unauthenticated users -> always go to login first
+        // RULE 1: Unauthenticated users -> always go to school picker first
         // Onboarding happens AFTER authentication, not before
         if (!isAuthenticated) {
-          console.log('[AuthGate] Not authenticated, redirecting to login');
+          console.log('[AuthGate] Not authenticated, redirecting to school picker');
           if (!isAuthRoute) {
-            router.replace('/(auth)/login');
+            router.replace('/(auth)/select-school');
           }
           setIsChecking(false);
           return;
@@ -136,10 +136,10 @@ function AuthAndOnboardingGate({ children }: { children: React.ReactNode }) {
         const response = await apiClient.get<{ onboarding_complete: boolean }>('/user/profile');
         console.log('[AuthGate] Profile response status:', response.status);
 
-        // Handle auth errors - redirect to login
+        // Handle auth errors - redirect to school picker
         if (response.status === 401 || response.status === 403) {
-          console.warn('[AuthGate] Auth token invalid/expired, redirecting to login');
-          router.replace('/(auth)/login');
+          console.warn('[AuthGate] Auth token invalid/expired, redirecting to school picker');
+          router.replace('/(auth)/select-school');
           setIsChecking(false);
           return;
         }

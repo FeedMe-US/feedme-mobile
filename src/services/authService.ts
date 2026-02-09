@@ -330,6 +330,22 @@ class AuthService {
 
     return { success: true };
   }
+
+  /**
+   * Delete user account and all associated data
+   */
+  async deleteAccount(): Promise<{ success: boolean; error?: string }> {
+    const response = await apiClient.delete<{ success: boolean; message: string }>('/auth/account');
+
+    if (response.error) {
+      return { success: false, error: response.error };
+    }
+
+    // Sign out after deletion
+    await this.signOut();
+
+    return { success: true };
+  }
 }
 
 export const authService = new AuthService();

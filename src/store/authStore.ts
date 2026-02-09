@@ -30,6 +30,7 @@ interface AuthActions {
   signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   signInWithMagicLink: (email: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<{ success: boolean; error?: string }>;
   checkEmail: (email: string) => Promise<{
     isSupported: boolean;
     university: University | null;
@@ -251,6 +252,22 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     });
     // Clear local onboarding flag so next user goes through onboarding
     await setOnboardingComplete(false);
+  },
+
+  // Delete account and all data
+  deleteAccount: async () => {
+    const result = await authService.deleteAccount();
+
+    if (result.success) {
+      set({
+        status: 'unauthenticated',
+        user: null,
+        university: null,
+      });
+      await setOnboardingComplete(false);
+    }
+
+    return result;
   },
 
   // Check if email is from supported university
