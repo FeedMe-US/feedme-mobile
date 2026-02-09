@@ -192,3 +192,45 @@ export function onboardingDataToProfile(data: OnboardingData) {
   };
 }
 
+/**
+ * Convert moodPreferences (0-4 scale) to taste-profile API format (-5 to +5 scale)
+ *
+ * Mobile slider values:
+ *   0 = far left (American, mild, light, regulars, smooth)
+ *   2 = center (neutral)
+ *   4 = far right (World, spicy, hearty, adventurous, crunchy)
+ *
+ * API values:
+ *   -5 = far left
+ *   0 = center
+ *   +5 = far right
+ *
+ * Returns null if no moodPreferences set (user skipped this step)
+ */
+export function moodPreferencesToTasteProfile(data: OnboardingData): {
+  comfort_food: number;
+  spice_tolerance: number;
+  meal_style: number;
+  variety_seeking: number;
+  texture_preference: number;
+} | null {
+  const prefs = data.moodPreferences;
+  if (!prefs) return null;
+
+  // Convert 0-4 scale to -5 to +5 scale
+  // Formula: Math.round(value * 2.5 - 5)
+  // 0 → -5, 1 → -3, 2 → 0, 3 → 3, 4 → 5
+  const convert = (val: number | undefined): number => {
+    const v = val ?? 2; // Default to center if undefined
+    return Math.round(v * 2.5 - 5);
+  };
+
+  return {
+    comfort_food: convert(prefs.cuisine),        // American (0) → Western (-5), World (4) → Global (+5)
+    spice_tolerance: convert(prefs.spice),       // Mild (0) → Mild (-5), Spicy (4) → Spicy (+5)
+    meal_style: convert(prefs.heaviness),        // Light (0) → Simple (-5), Hearty (4) → Complex (+5)
+    variety_seeking: convert(prefs.adventurousness), // Regulars (0) → Familiar (-5), Try New (4) → New (+5)
+    texture_preference: convert(prefs.texture),  // Smooth (0) → Soft (-5), Crunchy (4) → Crunchy (+5)
+  };
+}
+

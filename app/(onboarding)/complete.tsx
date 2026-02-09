@@ -7,7 +7,7 @@ import { colors, spacing } from '@/src/theme';
 import { Text } from '@/src/ui/Text';
 import { Screen } from '@/src/ui/Screen';
 import { setOnboardingComplete } from '@/src/lib/onboarding';
-import { getOnboardingData, onboardingDataToProfile, clearOnboardingData } from '@/src/lib/onboardingData';
+import { getOnboardingData, onboardingDataToProfile, moodPreferencesToTasteProfile, clearOnboardingData } from '@/src/lib/onboardingData';
 import { apiClient } from '@/src/services/api';
 import { useIsAuthenticated } from '@/src/store/authStore';
 
@@ -47,6 +47,21 @@ export default function CompleteScreen() {
         } else {
           console.log('[Onboarding] Profile synced to backend successfully');
           console.log('[Onboarding] Response data:', JSON.stringify(response.data, null, 2));
+
+          // Sync taste profile (moodPreferences) if provided
+          const tasteProfile = moodPreferencesToTasteProfile(onboardingData);
+          if (tasteProfile) {
+            console.log('[Onboarding] Syncing taste profile:', JSON.stringify(tasteProfile, null, 2));
+            const tasteResponse = await apiClient.post('/user/onboarding/taste-profile', tasteProfile);
+            if (tasteResponse.error) {
+              console.error('[Onboarding] Taste profile sync failed:', tasteResponse.error);
+            } else {
+              console.log('[Onboarding] Taste profile synced:', tasteResponse.data);
+            }
+          } else {
+            console.log('[Onboarding] No moodPreferences to sync');
+          }
+
           // Clear onboarding data after successful sync
           await clearOnboardingData();
           console.log('[Onboarding] Local onboarding data cleared');

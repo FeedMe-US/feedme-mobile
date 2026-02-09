@@ -242,6 +242,70 @@ Before committing API changes:
 
 ---
 
+## Onboarding Flow
+
+### Data Storage Pattern
+Onboarding uses AsyncStorage to accumulate data across screens, then syncs to API on completion.
+
+```
+Screen 1-N: saveOnboardingData({...partial})
+    ↓
+AsyncStorage (@onboarding_data)
+    ↓
+complete.tsx: getOnboardingData() → sync to API → clearOnboardingData()
+```
+
+**Key files:**
+- `src/lib/onboardingData.ts` - Storage + conversion functions
+- `app/(onboarding)/complete.tsx` - Final sync to API
+
+### Data Conversions
+
+**Height**: Mobile uses feet/inches, API uses total inches
+```typescript
+height_inches = heightFeet * 12 + heightInches
+```
+
+**Activity Level**: Mobile uses short keys, API uses display strings
+```typescript
+{ 'sedentary': 'Sedentary', 'light': 'Lightly Active', ... }
+```
+
+**Goal Type**: Mobile uses short keys, API uses display strings
+```typescript
+{ 'bulk': 'Bulk Up', 'lean': 'Get Lean', 'maintain': 'Maintain', ... }
+```
+
+**Dining Locations**: Mobile uses slugs, API uses numeric IDs
+```typescript
+{ 'de-neve': 28, 'b-plate': 29, 'epicuria': 31, ... }
+```
+Full mapping in `onboardingDataToProfile()`.
+
+### Taste Profile (moodPreferences)
+
+Mobile collects 5 sliders (0-4 scale), API expects -5 to +5 scale.
+
+| Mobile Field | API Field | Conversion |
+|-------------|-----------|------------|
+| `cuisine` (0-4) | `comfort_food` (-5 to +5) | `Math.round(val * 2.5 - 5)` |
+| `spice` (0-4) | `spice_tolerance` (-5 to +5) | Same formula |
+| `heaviness` (0-4) | `meal_style` (-5 to +5) | Same formula |
+| `adventurousness` (0-4) | `variety_seeking` (-5 to +5) | Same formula |
+| `texture` (0-4) | `texture_preference` (-5 to +5) | Same formula |
+
+**Endpoint**: `POST /user/onboarding/taste-profile`
+**Function**: `moodPreferencesToTasteProfile()` in `onboardingData.ts`
+
+### Diet Strictness
+
+Mobile `dietStrictness` maps directly to API `macro_adherence_tier`:
+- `'strict'` → ±5% macro tolerance
+- `'balanced'` → ±10% (default)
+- `'relaxed'` → ±20%
+
+---
+
 ## Questions to Ask Before API Work
 
 If you're unsure about any of these, ask before proceeding:
