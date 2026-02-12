@@ -8,11 +8,12 @@ import { Button } from '@/src/ui/Button';
 import { Screen } from '@/src/ui/Screen';
 import { haptics } from '@/src/utils/haptics';
 import { MaterialIcons } from '@expo/vector-icons';
-import { saveOnboardingData } from '@/src/lib/onboardingData';
+import { saveOnboardingData, getOnboardingData } from '@/src/lib/onboardingData';
 
 const MIN_WEIGHT = 80;
 const MAX_WEIGHT = 300;
 const DEFAULT_WEIGHT = 165;
+const DEFAULT_GOAL_WEIGHT = 170;
 const STEP = 1;
 const ITEM_WIDTH = 40;
 
@@ -20,64 +21,113 @@ export default function WeightScreen() {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light'];
   const router = useRouter();
+
   const [weight, setWeight] = useState(DEFAULT_WEIGHT);
-  const [indicatorPosition, setIndicatorPosition] = useState(0);
-  const scrollViewRef = useRef<RNScrollView>(null);
-  const lastWeightRef = useRef(DEFAULT_WEIGHT);
+  const [goalWeight, setGoalWeight] = useState(DEFAULT_GOAL_WEIGHT);
+  const [indicatorPos1, setIndicatorPos1] = useState(0);
+  const [indicatorPos2, setIndicatorPos2] = useState(0);
+
+  const scrollRef1 = useRef<RNScrollView>(null);
+  const scrollRef2 = useRef<RNScrollView>(null);
+  const lastWeight1 = useRef(DEFAULT_WEIGHT);
+  const lastWeight2 = useRef(DEFAULT_GOAL_WEIGHT);
 
   useEffect(() => {
-    // Scroll to initial weight
-    const initialOffset = (DEFAULT_WEIGHT - MIN_WEIGHT) * ITEM_WIDTH;
-    setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ x: initialOffset, animated: false });
-    }, 100);
+    const loadData = async () => {
+      const data = await getOnboardingData();
+
+      // Restore current weight if previously saved (e.g. user navigated back)
+      const savedWeight = data.weight || DEFAULT_WEIGHT;
+      setWeight(savedWeight);
+      lastWeight1.current = savedWeight;
+
+      // Compute goal weight: restore saved value, or smart default from goal
+      let defaultGoal: number;
+      if (data.goalWeight) {
+        defaultGoal = data.goalWeight;
+      } else {
+        defaultGoal = savedWeight;
+        if (data.goal === 'bulk') defaultGoal = savedWeight + 10;
+        else if (data.goal === 'lean') defaultGoal = savedWeight - 6;
+        else if (data.goal === 'perform') defaultGoal = savedWeight + 4;
+      }
+      defaultGoal = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, defaultGoal));
+      setGoalWeight(defaultGoal);
+      lastWeight2.current = defaultGoal;
+
+      setTimeout(() => {
+        scrollRef1.current?.scrollTo({ x: (savedWeight - MIN_WEIGHT) * ITEM_WIDTH, animated: false });
+        scrollRef2.current?.scrollTo({ x: (defaultGoal - MIN_WEIGHT) * ITEM_WIDTH, animated: false });
+      }, 100);
+    };
+    loadData();
   }, []);
 
-  const handleScroll = (event: any) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const newWeight = Math.round(offsetX / ITEM_WIDTH) + MIN_WEIGHT;
-    const clampedWeight = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, newWeight));
-    
-    // Calculate indicator position to align with selected weight
-    const screenWidth = Dimensions.get('window').width;
-    const visibleItems = Math.floor(screenWidth / ITEM_WIDTH);
-    const paddingLeft = (visibleItems - 1) / 2 * ITEM_WIDTH;
-    const centerX = screenWidth / 2;
-    const selectedOffset = (clampedWeight - MIN_WEIGHT) * ITEM_WIDTH;
-    const indicatorX = centerX - paddingLeft + selectedOffset;
-    setIndicatorPosition(indicatorX);
-    
-    if (clampedWeight !== lastWeightRef.current) {
-      lastWeightRef.current = clampedWeight;
-      haptics.selection();
-      setWeight(clampedWeight);
-    }
+  const makeScrollHandler = (
+    setValue: (v: number) => void,
+    setIndicator: (v: number) => void,
+    lastRef: React.RefObject<number>,
+  ) => {
+    const onScroll = (event: any) => {
+      const offsetX = event.nativeEvent.contentOffset.x;
+      const newW = Math.round(offsetX / ITEM_WIDTH) + MIN_WEIGHT;
+      const clamped = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, newW));
+
+      const sw = Dimensions.get('window').width;
+      const vis = Math.floor(sw / ITEM_WIDTH);
+      const pad = ((vis - 1) / 2) * ITEM_WIDTH;
+      setIndicator(sw / 2 - pad + (clamped - MIN_WEIGHT) * ITEM_WIDTH);
+
+      if (clamped !== lastRef.current) {
+        lastRef.current = clamped;
+        haptics.selection();
+        setValue(clamped);
+      }
+    };
+
+    const onMomentumEnd = (event: any, ref: React.RefObject<RNScrollView | null>) => {
+      const offsetX = event.nativeEvent.contentOffset.x;
+      const newW = Math.round(offsetX / ITEM_WIDTH) + MIN_WEIGHT;
+      const clamped = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, newW));
+      const snapOffset = (clamped - MIN_WEIGHT) * ITEM_WIDTH;
+
+      const sw = Dimensions.get('window').width;
+      const vis = Math.floor(sw / ITEM_WIDTH);
+      const pad = ((vis - 1) / 2) * ITEM_WIDTH;
+      setIndicator(sw / 2 - pad + snapOffset);
+
+      ref.current?.scrollTo({ x: snapOffset, animated: true });
+      setValue(clamped);
+    };
+
+    return { onScroll, onMomentumEnd };
   };
 
-  const handleMomentumScrollEnd = (event: any) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const newWeight = Math.round(offsetX / ITEM_WIDTH) + MIN_WEIGHT;
-    const clampedWeight = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, newWeight));
-    const snapOffset = (clampedWeight - MIN_WEIGHT) * ITEM_WIDTH;
-    
-    // Update indicator position after snap
-    const screenWidth = Dimensions.get('window').width;
-    const visibleItems = Math.floor(screenWidth / ITEM_WIDTH);
-    const paddingLeft = (visibleItems - 1) / 2 * ITEM_WIDTH;
-    const centerX = screenWidth / 2;
-    const indicatorX = centerX - paddingLeft + snapOffset;
-    setIndicatorPosition(indicatorX);
-    
-    scrollViewRef.current?.scrollTo({ x: snapOffset, animated: true });
-    setWeight(clampedWeight);
-  };
+  const handler1 = makeScrollHandler(setWeight, setIndicatorPos1, lastWeight1);
+  const handler2 = makeScrollHandler(setGoalWeight, setIndicatorPos2, lastWeight2);
 
   const handleContinue = async () => {
-    await saveOnboardingData({ weight });
-    router.push('/(onboarding)/goal-weight');
+    // Auto-determine goal type from weight difference
+    let suggestedGoal: 'bulk' | 'lean' | 'maintain' | 'perform' = 'maintain';
+    const diff = goalWeight - weight;
+
+    if (diff <= -5) {
+      suggestedGoal = 'lean';
+    } else if (diff >= -4 && diff <= -2) {
+      suggestedGoal = 'lean';
+    } else if (diff >= -1 && diff <= 2) {
+      suggestedGoal = 'maintain';
+    } else if (diff >= 3 && diff <= 8) {
+      suggestedGoal = 'lean';
+    } else if (diff >= 9) {
+      suggestedGoal = 'bulk';
+    }
+
+    await saveOnboardingData({ weight, goalWeight, goal: suggestedGoal });
+    router.push('/(onboarding)/activity');
   };
 
-  // Generate all weights
+  // Generate all weight values
   const weights: number[] = [];
   for (let i = MIN_WEIGHT; i <= MAX_WEIGHT; i += STEP) {
     weights.push(i);
@@ -85,8 +135,60 @@ export default function WeightScreen() {
 
   const screenWidth = Dimensions.get('window').width;
   const visibleItems = Math.floor(screenWidth / ITEM_WIDTH);
-  const paddingLeft = (visibleItems - 1) / 2 * ITEM_WIDTH;
-  const paddingRight = (visibleItems - 1) / 2 * ITEM_WIDTH;
+  const padSide = ((visibleItems - 1) / 2) * ITEM_WIDTH;
+
+  const renderRuler = (
+    ref: React.RefObject<RNScrollView | null>,
+    value: number,
+    indicatorPos: number,
+    handlers: ReturnType<typeof makeScrollHandler>,
+  ) => (
+    <View style={styles.rulerContainer}>
+      <View style={[styles.rulerMask, styles.rulerMaskLeft, { backgroundColor: themeColors.background }]} />
+      <RNScrollView
+        ref={ref}
+        horizontal
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scrollContent, { paddingLeft: padSide, paddingRight: padSide }]}
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={ITEM_WIDTH}
+        decelerationRate="fast"
+        onScroll={handlers.onScroll}
+        onMomentumScrollEnd={(e) => handlers.onMomentumEnd(e, ref)}
+        scrollEventThrottle={16}>
+        {weights.map((w) => {
+          const isMainMarker = w % 10 === 0;
+          const isNearWeight = Math.abs(w - value) <= 2;
+          return (
+            <View key={w} style={[styles.markerContainer, { width: ITEM_WIDTH }]}>
+              <View
+                style={[
+                  styles.marker,
+                  {
+                    height: isMainMarker ? 35 : 10,
+                    width: isMainMarker ? 3 : 2,
+                    backgroundColor: isNearWeight
+                      ? themeColors.primary
+                      : themeColors.border,
+                  },
+                ]}
+              />
+            </View>
+          );
+        })}
+      </RNScrollView>
+      <View style={[styles.rulerMask, styles.rulerMaskRight, { backgroundColor: themeColors.background }]} />
+      <View
+        style={[
+          styles.weightIndicator,
+          {
+            backgroundColor: themeColors.primary,
+            left: indicatorPos || '50%',
+          },
+        ]}
+      />
+    </View>
+  );
 
   return (
     <Screen>
@@ -99,79 +201,36 @@ export default function WeightScreen() {
           <MaterialIcons name="arrow-back" size={24} color={themeColors.text} />
         </TouchableOpacity>
 
-        {/* Header */}
-        <View style={styles.header}>
-          <Text variant="h1" weight="bold" style={styles.title}>
-            What is your weight?
+        {/* Current Weight */}
+        <View style={[styles.section, styles.firstSection]}>
+          <Text variant="body" weight="semibold" color="secondary" style={styles.sectionLabel}>
+            Current Weight
           </Text>
-          <Text variant="body" color="secondary" style={styles.subtitle}>
-            This helps us calculate your nutrition goals
-          </Text>
+          <View style={styles.weightDisplay}>
+            <Text variant="h1" weight="bold" style={styles.weightValue}>
+              {weight}
+            </Text>
+            <Text variant="body" color="secondary" style={styles.weightUnit}>
+              lbs
+            </Text>
+          </View>
+          {renderRuler(scrollRef1, weight, indicatorPos1, handler1)}
         </View>
 
-        {/* Weight Display - Large Number */}
-        <View style={styles.weightDisplay}>
-          <Text variant="h1" weight="bold" style={styles.weightValue}>
-            {weight}
+        {/* Goal Weight */}
+        <View style={styles.section}>
+          <Text variant="body" weight="semibold" color="secondary" style={styles.sectionLabel}>
+            Goal Weight
           </Text>
-          <Text variant="body" color="secondary" style={styles.weightUnit}>
-            lbs
-          </Text>
-        </View>
-
-        {/* Scrollable Weight Ruler */}
-        <View style={styles.rulerContainer}>
-          <View style={[styles.rulerMask, styles.rulerMaskLeft, { backgroundColor: themeColors.background }]} />
-          <RNScrollView
-            ref={scrollViewRef}
-            horizontal
-            style={styles.scrollView}
-            contentContainerStyle={[
-              styles.scrollContent,
-              { paddingLeft, paddingRight },
-            ]}
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={ITEM_WIDTH}
-            decelerationRate="fast"
-            onScroll={handleScroll}
-            onMomentumScrollEnd={handleMomentumScrollEnd}
-            scrollEventThrottle={16}>
-            {weights.map((weightOption) => {
-              const isMainMarker = weightOption % 10 === 0;
-              const isNearWeight = Math.abs(weightOption - weight) <= 2;
-              return (
-                <View
-                  key={weightOption}
-                  style={[
-                    styles.markerContainer,
-                    { width: ITEM_WIDTH },
-                  ]}>
-                  <View
-                    style={[
-                      styles.marker,
-                      {
-                        height: isMainMarker ? 35 : 10,
-                        width: isMainMarker ? 3 : 2,
-                        backgroundColor: isNearWeight
-                          ? themeColors.primary
-                          : themeColors.border,
-                      },
-                    ]}
-                  />
-                </View>
-              );
-            })}
-          </RNScrollView>
-          <View style={[styles.rulerMask, styles.rulerMaskRight, { backgroundColor: themeColors.background }]} />
-          <View
-            style={[
-              styles.weightIndicator,
-              {
-                backgroundColor: themeColors.primary,
-                left: indicatorPosition || '50%', // Align with selected weight
-              },
-            ]}
-          />
+          <View style={styles.weightDisplay}>
+            <Text variant="h1" weight="bold" style={styles.weightValue}>
+              {goalWeight}
+            </Text>
+            <Text variant="body" color="secondary" style={styles.weightUnit}>
+              lbs
+            </Text>
+          </View>
+          {renderRuler(scrollRef2, goalWeight, indicatorPos2, handler2)}
         </View>
       </View>
 
@@ -207,20 +266,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: {
-    marginBottom: spacing.xl,
+  firstSection: {
     marginTop: spacing.xxl + spacing.sm,
-    alignItems: 'center',
   },
-  title: {
-    marginBottom: spacing.sm,
+  section: {
+    marginTop: spacing.lg,
   },
-  subtitle: {
-    marginTop: spacing.xs,
+  sectionLabel: {
+    textAlign: 'center',
+    marginBottom: spacing.xs,
   },
   weightDisplay: {
     alignItems: 'center',
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.md,
   },
   weightValue: {
     marginBottom: spacing.xs,
@@ -230,7 +288,6 @@ const styles = StyleSheet.create({
   },
   rulerContainer: {
     position: 'relative',
-    marginBottom: spacing.xl,
     paddingVertical: spacing.lg,
     height: 80,
     justifyContent: 'center',
@@ -264,12 +321,6 @@ const styles = StyleSheet.create({
   marker: {
     width: 2,
     marginBottom: spacing.xs,
-  },
-  markerLabel: {
-    position: 'absolute',
-    bottom: -22,
-    fontSize: 12,
-    fontWeight: '600',
   },
   weightIndicator: {
     position: 'absolute',

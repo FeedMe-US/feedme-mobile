@@ -11,7 +11,6 @@ export default function OnboardingLayout() {
       <Stack.Screen name="age" />
       <Stack.Screen name="height" />
       <Stack.Screen name="weight" />
-      <Stack.Screen name="goal-weight" />
       <Stack.Screen name="activity" />
       <Stack.Screen name="meal-plan" />
       <Stack.Screen name="dining-locations" />

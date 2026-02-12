@@ -13,6 +13,7 @@ import { Screen } from '@/src/ui/Screen';
 import { Text } from '@/src/ui/Text';
 import { haptics } from '@/src/utils/haptics';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '@/src/store/authStore';
 
 interface School {
   id: string;
@@ -46,6 +47,27 @@ export default function SelectSchoolScreen() {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'dark'];
   const router = useRouter();
+
+  const handleDevBypass = () => {
+    haptics.light();
+    useAuthStore.setState({
+      status: 'authenticated',
+      user: {
+        user_id: 'dev-bypass-user',
+        email: 'dev@test.ucla.edu',
+        university_id: 1,
+        university_slug: 'ucla',
+        university_name: 'UCLA',
+      },
+      university: {
+        id: 1,
+        slug: 'ucla',
+        name: 'UCLA',
+        primary_color: '#2774AE',
+      },
+      _initialized: true,
+    });
+  };
 
   const handleSelectSchool = (school: School) => {
     if (!school.available) {
@@ -144,6 +166,18 @@ export default function SelectSchoolScreen() {
           <Text variant="bodySmall" color="secondary" style={styles.footerText}>
             More universities coming soon!
           </Text>
+
+          {__DEV__ && (
+            <TouchableOpacity
+              style={styles.devBypassButton}
+              onPress={handleDevBypass}
+              activeOpacity={0.7}>
+              <Ionicons name="bug" size={16} color="#FF6B00" />
+              <Text variant="bodySmall" style={styles.devBypassText}>
+                Dev Bypass (Local Testing)
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </Screen>
@@ -218,5 +252,20 @@ const styles = StyleSheet.create({
   },
   footerText: {
     textAlign: 'center',
+  },
+  devBypassButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#FF6B00',
+    borderStyle: 'dashed',
+  },
+  devBypassText: {
+    color: '#FF6B00',
   },
 });
