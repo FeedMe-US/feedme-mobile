@@ -4,7 +4,9 @@
  */
 
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Platform, Linking, Text as RNText } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal, Text as RNText } from 'react-native';
+// TEMPORARILY REMOVED - Platform & Linking were used by notification preferences
+// import { Platform, Linking } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors, spacing, radius } from '@/src/theme';
 import { Screen } from '@/src/ui/Screen';
@@ -25,7 +27,8 @@ import { getOnboardingData, saveOnboardingData } from '@/src/lib/onboardingData'
 import { useIsAuthenticated, useAuthStore } from '@/src/store/authStore';
 import { apiClient } from '@/src/services/api';
 import { userService } from '@/src/services/userService';
-import DateTimePicker from '@react-native-community/datetimepicker';
+// TEMPORARILY REMOVED - Notification preferences feature
+// import DateTimePicker from '@react-native-community/datetimepicker';
 import { ItemManagementModal, ItemOption } from '@/src/components/settings/ItemManagementModal';
 
 export default function ProfileScreen() {
@@ -153,18 +156,18 @@ export default function ProfileScreen() {
   // Get custom disliked foods (not in standard list)
   const customDislikedFoods = (dislikedFoods || []).filter(f => !dislikedFoodOptions.includes(f));
 
-  // Notification reminder times (when notifications fire)
-  const [reminderTimes, setReminderTimes] = useState<{
-    breakfast: Date | null;
-    lunch: Date | null;
-    dinner: Date | null;
-  }>({
-    breakfast: null,
-    lunch: null,
-    dinner: null,
-  });
-  const [editingReminder, setEditingReminder] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
-  const [tempReminderTime, setTempReminderTime] = useState<Date>(new Date());
+  // TEMPORARILY REMOVED - Notification preferences feature
+  // const [reminderTimes, setReminderTimes] = useState<{
+  //   breakfast: Date | null;
+  //   lunch: Date | null;
+  //   dinner: Date | null;
+  // }>({
+  //   breakfast: null,
+  //   lunch: null,
+  //   dinner: null,
+  // });
+  // const [editingReminder, setEditingReminder] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
+  // const [tempReminderTime, setTempReminderTime] = useState<Date>(new Date());
 
   // Load profile data - prefer backend if authenticated, fall back to local
   React.useEffect(() => {
@@ -381,14 +384,14 @@ export default function ProfileScreen() {
             .filter(Boolean) as string[];
           if (mappedHalls.length > 0) setSelectedHalls(mappedHalls);
         }
-        // Load saved meal reminder times (if any)
-        if (data.mealTimes) {
-          setReminderTimes({
-            breakfast: parseTimeStringToDate(data.mealTimes.breakfast),
-            lunch: parseTimeStringToDate(data.mealTimes.lunch),
-            dinner: parseTimeStringToDate(data.mealTimes.dinner),
-          });
-        }
+        // TEMPORARILY REMOVED - Notification preferences feature
+        // if (data.mealTimes) {
+        //   setReminderTimes({
+        //     breakfast: parseTimeStringToDate(data.mealTimes.breakfast),
+        //     lunch: parseTimeStringToDate(data.mealTimes.lunch),
+        //     dinner: parseTimeStringToDate(data.mealTimes.dinner),
+        //   });
+        // }
         // Load custom targets flag
         if (data.useCustomTargets !== undefined) {
           setUseCustomTargets(data.useCustomTargets);
@@ -406,21 +409,19 @@ export default function ProfileScreen() {
     loadProfileData();
   }, [isAuthenticated]);
 
-  // Persist reminder times to onboarding storage when they change (after initial load)
-  React.useEffect(() => {
-    if (isInitialLoad) return;
-
-    const persistReminderTimes = async () => {
-      const mealTimesData = {
-        breakfast: reminderTimes.breakfast ? formatReminderTime(reminderTimes.breakfast) : undefined,
-        lunch: reminderTimes.lunch ? formatReminderTime(reminderTimes.lunch) : undefined,
-        dinner: reminderTimes.dinner ? formatReminderTime(reminderTimes.dinner) : undefined,
-      };
-      await saveOnboardingData({ mealTimes: mealTimesData });
-    };
-
-    persistReminderTimes();
-  }, [reminderTimes, isInitialLoad]);
+  // TEMPORARILY REMOVED - Notification preferences feature
+  // React.useEffect(() => {
+  //   if (isInitialLoad) return;
+  //   const persistReminderTimes = async () => {
+  //     const mealTimesData = {
+  //       breakfast: reminderTimes.breakfast ? formatReminderTime(reminderTimes.breakfast) : undefined,
+  //       lunch: reminderTimes.lunch ? formatReminderTime(reminderTimes.lunch) : undefined,
+  //       dinner: reminderTimes.dinner ? formatReminderTime(reminderTimes.dinner) : undefined,
+  //     };
+  //     await saveOnboardingData({ mealTimes: mealTimesData });
+  //   };
+  //   persistReminderTimes();
+  // }, [reminderTimes, isInitialLoad]);
 
   // Save preferred dining halls when they change
   React.useEffect(() => {
@@ -890,54 +891,38 @@ export default function ProfileScreen() {
     setDislikedFoods(dislikedFoods.filter(f => f !== food));
   };
 
-  const handleReminderPress = (meal: 'breakfast' | 'lunch' | 'dinner') => {
-    const current = reminderTimes[meal] || defaultReminderTime(meal);
-    setEditingReminder(meal);
-    setTempReminderTime(current);
-  };
-
-  const handleReminderTimeChange = (event: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      const date = selectedDate || tempReminderTime;
-      if (editingReminder && date) {
-        setReminderTimes(prev => ({
-          ...prev,
-          [editingReminder]: date,
-        }));
-      }
-      setEditingReminder(null);
-    } else {
-      if (selectedDate) {
-        setTempReminderTime(selectedDate);
-      }
-    }
-  };
-
-  const handleReminderTimeSave = () => {
-    if (editingReminder) {
-      setReminderTimes(prev => ({
-        ...prev,
-        [editingReminder]: tempReminderTime,
-      }));
-    }
-    setEditingReminder(null);
-  };
-
-  const handleOpenNotificationSettings = async () => {
-    try {
-      if (Linking.openSettings) {
-        await Linking.openSettings();
-        return;
-      }
-      await Linking.openURL('app-settings:');
-    } catch (error) {
-      console.error('Error opening notification settings:', error);
-      Alert.alert(
-        'Unable to open Settings',
-        'Please open the iOS Settings app, find FeedMe, and update notification permissions there.'
-      );
-    }
-  };
+  // TEMPORARILY REMOVED - Notification preferences feature
+  // const handleReminderPress = (meal: 'breakfast' | 'lunch' | 'dinner') => {
+  //   const current = reminderTimes[meal] || defaultReminderTime(meal);
+  //   setEditingReminder(meal);
+  //   setTempReminderTime(current);
+  // };
+  // const handleReminderTimeChange = (event: any, selectedDate?: Date) => {
+  //   if (Platform.OS === 'android') {
+  //     const date = selectedDate || tempReminderTime;
+  //     if (editingReminder && date) {
+  //       setReminderTimes(prev => ({ ...prev, [editingReminder]: date }));
+  //     }
+  //     setEditingReminder(null);
+  //   } else {
+  //     if (selectedDate) { setTempReminderTime(selectedDate); }
+  //   }
+  // };
+  // const handleReminderTimeSave = () => {
+  //   if (editingReminder) {
+  //     setReminderTimes(prev => ({ ...prev, [editingReminder]: tempReminderTime }));
+  //   }
+  //   setEditingReminder(null);
+  // };
+  // const handleOpenNotificationSettings = async () => {
+  //   try {
+  //     if (Linking.openSettings) { await Linking.openSettings(); return; }
+  //     await Linking.openURL('app-settings:');
+  //   } catch (error) {
+  //     console.error('Error opening notification settings:', error);
+  //     Alert.alert('Unable to open Settings', 'Please open the iOS Settings app, find FeedMe, and update notification permissions there.');
+  //   }
+  // };
 
   // Original return restored
   return (
@@ -1679,15 +1664,14 @@ export default function ProfileScreen() {
           </View>
         </Card>
 
-        {/* Notification Preferences - When reminders fire */}
-        <Card variant="elevated" padding="lg" style={styles.card}>
+        {/* TEMPORARILY REMOVED - Notification Preferences card */}
+        {/* <Card variant="elevated" padding="lg" style={styles.card}>
           <Text variant="h4" weight="semibold" style={styles.sectionTitle}>
             Notification Preferences
           </Text>
           <Text variant="bodySmall" color="secondary" style={styles.subtitle}>
             We&apos;ll send reminders around these times
           </Text>
-
           <View style={styles.notificationSection}>
             {([
               { key: 'breakfast', label: 'Breakfast Reminder' },
@@ -1710,7 +1694,7 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             ))}
           </View>
-        </Card>
+        </Card> */}
 
         {/* App Settings - Matching screenshot */}
         <Card variant="elevated" padding="lg" style={styles.card}>
@@ -1733,7 +1717,8 @@ export default function ProfileScreen() {
               }}
             />
           </View>
-          <TouchableOpacity
+          {/* TEMPORARILY REMOVED - Notification Permissions row */}
+          {/* <TouchableOpacity
             style={styles.settingRow}
             onPress={() => {
               haptics.light();
@@ -1743,7 +1728,7 @@ export default function ProfileScreen() {
               Notification Permissions
             </Text>
             <Text style={{ color: themeColors.textSecondary, fontSize: 14 }}>→</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
           <TouchableOpacity
             style={styles.settingRow}
             onPress={() => {
@@ -2092,8 +2077,8 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Notification time picker - iOS style */}
-      {Platform.OS === 'ios' && editingReminder && (
+      {/* TEMPORARILY REMOVED - Notification time pickers */}
+      {/* {Platform.OS === 'ios' && editingReminder && (
         <View style={styles.iosPickerOverlay}>
           <Card variant="elevated" padding="lg" style={styles.iosPickerContainer}>
             <View style={styles.iosPickerHeader}>
@@ -2123,8 +2108,6 @@ export default function ProfileScreen() {
           </Card>
         </View>
       )}
-
-      {/* Notification time picker - Android dialog */}
       {Platform.OS === 'android' && editingReminder && (
         <DateTimePicker
           value={tempReminderTime}
@@ -2132,7 +2115,7 @@ export default function ProfileScreen() {
           display="default"
           onChange={handleReminderTimeChange}
         />
-      )}
+      )} */}
 
       {/* Allergen Management Modal */}
       <ItemManagementModal
@@ -2173,46 +2156,42 @@ export default function ProfileScreen() {
   );
 }
 
-// Helpers for notification reminder times
-const defaultReminderTime = (meal: 'breakfast' | 'lunch' | 'dinner'): Date => {
-  const date = new Date();
-  if (meal === 'breakfast') {
-    date.setHours(8, 0, 0, 0);
-  } else if (meal === 'lunch') {
-    date.setHours(12, 0, 0, 0);
-  } else {
-    date.setHours(18, 0, 0, 0);
-  }
-  return date;
-};
-
-const formatReminderTime = (date: Date | null): string => {
-  if (!date) return '--:-- --';
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  const displayHours = hours % 12 || 12;
-  const displayMinutes = minutes.toString().padStart(2, '0');
-  return `${displayHours}:${displayMinutes} ${ampm}`;
-};
-
-const parseTimeStringToDate = (time?: string): Date | null => {
-  if (!time) return null;
-  const parts = time.split(' ');
-  if (parts.length !== 2) return null;
-  const [hm, ampm] = parts;
-  const [hStr, mStr] = hm.split(':');
-  const hoursNum = parseInt(hStr, 10);
-  const minutesNum = parseInt(mStr, 10);
-  if (isNaN(hoursNum) || isNaN(minutesNum)) return null;
-  let hours24 = hoursNum % 12;
-  if (ampm.toUpperCase() === 'PM') {
-    hours24 += 12;
-  }
-  const date = new Date();
-  date.setHours(hours24, minutesNum, 0, 0);
-  return date;
-};
+// TEMPORARILY REMOVED - Notification preference helpers
+// const defaultReminderTime = (meal: 'breakfast' | 'lunch' | 'dinner'): Date => {
+//   const date = new Date();
+//   if (meal === 'breakfast') {
+//     date.setHours(8, 0, 0, 0);
+//   } else if (meal === 'lunch') {
+//     date.setHours(12, 0, 0, 0);
+//   } else {
+//     date.setHours(18, 0, 0, 0);
+//   }
+//   return date;
+// };
+// const formatReminderTime = (date: Date | null): string => {
+//   if (!date) return '--:-- --';
+//   const hours = date.getHours();
+//   const minutes = date.getMinutes();
+//   const ampm = hours >= 12 ? 'PM' : 'AM';
+//   const displayHours = hours % 12 || 12;
+//   const displayMinutes = minutes.toString().padStart(2, '0');
+//   return `${displayHours}:${displayMinutes} ${ampm}`;
+// };
+// const parseTimeStringToDate = (time?: string): Date | null => {
+//   if (!time) return null;
+//   const parts = time.split(' ');
+//   if (parts.length !== 2) return null;
+//   const [hm, ampm] = parts;
+//   const [hStr, mStr] = hm.split(':');
+//   const hoursNum = parseInt(hStr, 10);
+//   const minutesNum = parseInt(mStr, 10);
+//   if (isNaN(hoursNum) || isNaN(minutesNum)) return null;
+//   let hours24 = hoursNum % 12;
+//   if (ampm.toUpperCase() === 'PM') { hours24 += 12; }
+//   const date = new Date();
+//   date.setHours(hours24, minutesNum, 0, 0);
+//   return date;
+// };
 
 const styles = StyleSheet.create({
   container: {
