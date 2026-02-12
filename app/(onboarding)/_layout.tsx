@@ -12,12 +12,14 @@ export default function OnboardingLayout() {
       <Stack.Screen name="height" />
       <Stack.Screen name="weight" />
       <Stack.Screen name="activity" />
-      <Stack.Screen name="meal-plan" />
+      {/* Meal plan screen temporarily removed from flow - code kept in meal-plan.tsx */}
+      {/* <Stack.Screen name="meal-plan" /> */}
       <Stack.Screen name="dining-locations" />
       <Stack.Screen name="dietary-requirements" />
       <Stack.Screen name="allergies" />
       <Stack.Screen name="ingredients-avoid" />
-      <Stack.Screen name="meal-times" />
+      {/* Meal times screen temporarily removed from flow - code kept in meal-times.tsx */}
+      {/* <Stack.Screen name="meal-times" /> */}
       <Stack.Screen name="mood-preferences" />
       <Stack.Screen name="diet-strictness" />
       {/* Reminders screen temporarily removed from flow - code kept in reminders.tsx */}

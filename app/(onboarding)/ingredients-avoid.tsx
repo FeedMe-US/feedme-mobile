@@ -65,7 +65,7 @@ export default function IngredientsAvoidScreen() {
   const handleContinue = async () => {
     const allSelected = Array.from(selectedIngredients);
     await saveOnboardingData({ ingredientsAvoid: allSelected });
-    router.push('/(onboarding)/meal-times');
+    router.push('/(onboarding)/mood-preferences');
   };
 
   const allIngredients = [...defaultIngredients, ...customIngredients];
