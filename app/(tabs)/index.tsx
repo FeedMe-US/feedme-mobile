@@ -109,7 +109,7 @@ export default function HomeScreen() {
       if (statusInfo.status === 'closed') {
         // Hall is closed - show closed message immediately
         const hallNameMap: Record<string, string> = {
-          'bruin-plate': 'Bruin Plate',
+          'bruin-plate': 'BPlate',
           'b-plate': 'BPlate',
           'de-neve-dining': 'De Neve Dining',
           'de-neve': 'De Neve Dining',
@@ -121,7 +121,7 @@ export default function HomeScreen() {
           'the-study-at-hedrick': 'The Study',
           'the-study': 'The Study',
           'the-drey': 'The Drey',
-          'bruin-cafe': 'Bruin Cafe',
+          'bruin-cafe': 'BCafe',
           'cafe-1919': 'Cafe 1919',
           'epicuria-at-ackerman': 'Epicuria at Ackerman',
           'anderson-cafe': 'Anderson Café',
@@ -405,7 +405,7 @@ useFocusEffect(
       // Create a complete mapping of all possible dining halls (fallback data)
       const allPossibleHalls: DiningHall[] = [
         // Residential dining
-        { id: 29, name: 'Bruin Plate', slug: 'bruin-plate', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false },
+        { id: 29, name: 'BPlate', slug: 'bruin-plate', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false },
         { id: 28, name: 'De Neve Dining', slug: 'de-neve-dining', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false },
         { id: 31, name: 'Epicuria at Covel', slug: 'epicuria-at-covel', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false },
         { id: 30, name: 'Feast at Rieber', slug: 'spice-kitchen', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
@@ -413,7 +413,7 @@ useFocusEffect(
         { id: 39, name: 'Rendezvous', slug: 'rendezvous', type: 'boutique', is_residential: false, campus_area: 'South', is_open_now: false },
         { id: 37, name: 'The Study at Hedrick', slug: 'the-study-at-hedrick', type: 'boutique', is_residential: false, campus_area: 'Central', is_open_now: false },
         { id: 38, name: 'The Drey', slug: 'the-drey', type: 'boutique', is_residential: false, campus_area: 'North', is_open_now: false },
-        { id: 34, name: 'Bruin Cafe', slug: 'bruin-cafe', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
+        { id: 34, name: 'BCafe', slug: 'bruin-cafe', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
         { id: 36, name: 'Cafe 1919', slug: 'cafe-1919', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
         { id: 41, name: 'Epicuria at Ackerman', slug: 'epicuria-at-ackerman', type: 'boutique', is_residential: false, campus_area: 'Central', is_open_now: false },
         // ASUCLA / LuValle / satellite locations
@@ -862,7 +862,7 @@ useFocusEffect(
                 // Map slugs to proper display names
               const hallNameMap: Record<string, string> = {
                 // Residential dining
-                'bruin-plate': 'Bruin Plate',
+                'bruin-plate': 'BPlate',
                 'b-plate': 'BPlate',
                 'de-neve-dining': 'De Neve Dining',
                 'de-neve': 'De Neve Dining',
@@ -875,7 +875,7 @@ useFocusEffect(
                 'the-study-at-hedrick': 'The Study',
                 'the-study': 'The Study',
                 'the-drey': 'The Drey',
-                'bruin-cafe': 'Bruin Cafe',
+                'bruin-cafe': 'BCafe',
                 'cafe-1919': 'Cafe 1919',
                 'epicuria-at-ackerman': 'Epicuria at Ackerman',
                 // ASUCLA / LuValle / satellite locations

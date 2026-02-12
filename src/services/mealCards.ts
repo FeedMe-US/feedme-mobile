@@ -129,7 +129,7 @@ function matchesRestrictions(
 // Lightweight mapping from location_id to human-readable label for swipe cards
 const LOCATION_LABELS: Record<number, string> = {
   28: 'De Neve Dining',
-  29: 'Bruin Plate',
+  29: 'BPlate',
   30: 'Feast at Rieber',
   31: 'Epicuria at Covel',
   34: 'Bruin Café',

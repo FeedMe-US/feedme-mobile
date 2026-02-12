@@ -203,14 +203,14 @@ interface RecommendResponse {
 
 // Fallback data for offline scenarios (IDs match database)
 const FALLBACK_DINING_HALLS: DiningHall[] = [
-  { id: 29, name: 'Bruin Plate', slug: 'bruin-plate', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false, latitude: 34.0689, longitude: -118.4452 },
+  { id: 29, name: 'BPlate', slug: 'bruin-plate', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false, latitude: 34.0689, longitude: -118.4452 },
   { id: 28, name: 'De Neve Dining', slug: 'de-neve-dining', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false, latitude: 34.0705, longitude: -118.4468 },
   { id: 31, name: 'Epicuria at Covel', slug: 'epicuria-at-covel', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false, latitude: 34.0680, longitude: -118.4455 },
   { id: 30, name: 'Feast at Rieber', slug: 'spice-kitchen', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false, latitude: 34.0695, longitude: -118.4445 },
   { id: 39, name: 'Rendezvous', slug: 'rendezvous', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false, latitude: 34.0710, longitude: -118.4470 },
   { id: 37, name: 'The Study at Hedrick', slug: 'the-study-at-hedrick', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false, latitude: 34.0690, longitude: -118.4450 },
   { id: 38, name: 'The Drey', slug: 'the-drey', type: 'boutique', is_residential: false, campus_area: 'North', is_open_now: false, latitude: 34.0700, longitude: -118.4460 },
-  { id: 34, name: 'Bruin Cafe', slug: 'bruin-cafe', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false, latitude: 34.0692, longitude: -118.4455 },
+  { id: 34, name: 'BCafe', slug: 'bruin-cafe', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false, latitude: 34.0692, longitude: -118.4455 },
   { id: 36, name: 'Cafe 1919', slug: 'cafe-1919', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false, latitude: 34.0685, longitude: -118.4460 },
   { id: 41, name: 'Epicuria at Ackerman', slug: 'epicuria-at-ackerman', type: 'boutique', is_residential: false, campus_area: 'Central', is_open_now: false, latitude: 34.0705, longitude: -118.4430 },
 ];

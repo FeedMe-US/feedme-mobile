@@ -47,7 +47,7 @@ const diningLocations: { id: DiningLocation; name: string }[] = [
   { id: 'rendezvous', name: 'Rendezvous' },
   { id: 'the-study-at-hedrick', name: 'The Study' },
   { id: 'the-drey', name: 'The Drey' },
-  { id: 'bruin-cafe', name: 'Bruin Cafe' },
+  { id: 'bruin-cafe', name: 'BCafe' },
   { id: 'cafe-1919', name: 'Cafe 1919' },
   { id: 'epicuria-at-ackerman', name: 'Epicuria at Ackerman' },
   // ASUCLA / LuValle / satellite locations

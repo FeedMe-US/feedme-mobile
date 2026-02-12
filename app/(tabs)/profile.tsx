@@ -125,7 +125,7 @@ export default function ProfileScreen() {
     'Rendezvous',
     'The Study',
     'The Drey',
-    'Bruin Cafe',
+    'BCafe',
     'Cafe 1919',
     // ASUCLA / LuValle / satellite locations
     'Anderson Café',
@@ -180,7 +180,7 @@ export default function ProfileScreen() {
         30: 'Feast',
         31: 'Epicuria at Covel',
         // Hill / campus restaurants
-        34: 'Bruin Cafe',
+        34: 'BCafe',
         36: 'Cafe 1919',
         37: 'The Study',
         38: 'The Drey',
@@ -204,7 +204,7 @@ export default function ProfileScreen() {
         'de-neve': 'De Neve',
         'de-neve-dining': 'De Neve Dining',
         'b-plate': 'BPlate',
-        'bruin-plate': 'Bruin Plate',
+        'bruin-plate': 'BPlate',
         'epicuria': 'Epicuria',
         'epicuria-at-covel': 'Epicuria at Covel',
         'rendezvous': 'Rendezvous',
@@ -213,7 +213,7 @@ export default function ProfileScreen() {
         'feast': 'Feast',
         'spice-kitchen': 'Feast',
         'the-drey': 'The Drey',
-        'bruin-cafe': 'Bruin Cafe',
+        'bruin-cafe': 'BCafe',
         'cafe-1919': 'Cafe 1919',
         'epicuria-at-ackerman': 'Epicuria at Ackerman',
         // ASUCLA / LuValle locations
@@ -439,7 +439,8 @@ export default function ProfileScreen() {
         'Epicuria': 31,
         'Epicuria at Covel': 31,
         // Hill / campus restaurants
-        'Bruin Cafe': 34,
+        'BCafe': 34,
+        'Bruin Cafe': 34, // backward compat
         'Cafe 1919': 36,
         'The Study': 37,
         'The Drey': 38,
@@ -472,7 +473,8 @@ export default function ProfileScreen() {
         'Rendezvous': 'rendezvous',
         'The Study': 'the-study-at-hedrick',
         'The Drey': 'the-drey',
-        'Bruin Cafe': 'bruin-cafe',
+        'BCafe': 'bruin-cafe',
+        'Bruin Cafe': 'bruin-cafe', // backward compat
         'Cafe 1919': 'cafe-1919',
         // ASUCLA / LuValle / satellite locations
         'Anderson Café': 'anderson-cafe',

@@ -38,7 +38,7 @@ const mockDiningHalls = [
   },
   {
     id: 29,
-    name: 'Bruin Plate',
+    name: 'BPlate',
     slug: 'bruin-plate',
     is_residential: true,
     is_open_now: true,
