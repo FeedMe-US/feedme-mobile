@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors, spacing, radius } from '@/src/theme';
@@ -8,58 +8,35 @@ import { Button } from '@/src/ui/Button';
 import { Screen } from '@/src/ui/Screen';
 import { MaterialIcons } from '@expo/vector-icons';
 import { saveOnboardingData } from '@/src/lib/onboardingData';
-
-const defaultIngredients = [
-  'Mushrooms',
-  'Cilantro',
-  'Olives',
-  'Spicy Food',
-  'Mayonnaise',
-  'Onions',
-  'Pickles',
-  'Blue Cheese',
-  'Anchovies',
-  'Tomatoes',
-];
+import { DISLIKED_FOOD_OPTIONS } from '@/src/constants/preferences';
+import { useItemSearch } from '@/src/hooks/useItemSearch';
 
 export default function IngredientsAvoidScreen() {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light'];
   const router = useRouter();
   const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(new Set());
-  const [searchText, setSearchText] = useState('');
-  const [customIngredients, setCustomIngredients] = useState<string[]>([]);
 
-  const handleToggleIngredient = (ingredient: string) => {
+  const { query, setQuery, results, isLoading, hasNoResults, error } = useItemSearch({
+    defaults: DISLIKED_FOOD_OPTIONS,
+    debounceMs: 300,
+  });
+
+  const handleToggleIngredient = (name: string) => {
     const newSelection = new Set(selectedIngredients);
-    if (newSelection.has(ingredient)) {
-      newSelection.delete(ingredient);
+    if (newSelection.has(name)) {
+      newSelection.delete(name);
     } else {
-      newSelection.add(ingredient);
+      newSelection.add(name);
     }
     setSelectedIngredients(newSelection);
   };
 
-  const handleAddCustomIngredient = () => {
-    const trimmedText = searchText.trim();
-    if (!trimmedText) return;
-
-    // Check if ingredient already exists (case-insensitive)
-    const allIngredients = [...defaultIngredients, ...customIngredients];
-    const existingIngredient = allIngredients.find(
-      (ing) => ing.toLowerCase() === trimmedText.toLowerCase()
-    );
-
-    if (existingIngredient) {
-      // Select the existing ingredient instead of adding duplicate
-      handleToggleIngredient(existingIngredient);
-      setSearchText('');
-    } else if (!customIngredients.includes(trimmedText)) {
-      // Only add if it's truly new
-      setCustomIngredients([...customIngredients, trimmedText]);
-      setSelectedIngredients(new Set([...selectedIngredients, trimmedText]));
-      setSearchText('');
-    }
+  const handleSelectFromSearch = (item: { id: string; name: string }) => {
+    const newSelection = new Set(selectedIngredients);
+    newSelection.add(item.name);
+    setSelectedIngredients(newSelection);
+    setQuery('');
   };
 
   const handleContinue = async () => {
@@ -68,14 +45,26 @@ export default function IngredientsAvoidScreen() {
     router.push('/(onboarding)/mood-preferences');
   };
 
-  const allIngredients = [...defaultIngredients, ...customIngredients];
   const hasSelections = selectedIngredients.size > 0;
+
+  // Build display list: selected items that aren't in current results + current results
+  const selectedArray = Array.from(selectedIngredients);
+  const resultNames = new Set(results.map(r => r.name));
+  const extraSelected = selectedArray
+    .filter(name => !resultNames.has(name))
+    .map(name => ({ id: name, name, isSelected: true }));
+
+  const displayItems = [
+    ...extraSelected,
+    ...results.map(r => ({ id: r.id, name: r.name, isSelected: selectedIngredients.has(r.name) })),
+  ];
 
   return (
     <Screen>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled">
         <View style={styles.container}>
           {/* Back Button */}
           <TouchableOpacity
@@ -88,10 +77,10 @@ export default function IngredientsAvoidScreen() {
           {/* Header */}
           <View style={styles.header}>
             <Text variant="h1" weight="bold" style={styles.title}>
-              Ingredients you avoid?
+              Foods to avoid?
             </Text>
             <Text variant="body" color="secondary" style={styles.subtitle}>
-              We won&apos;t show you meals with these
+              We&apos;ll deprioritize meals with these ingredients
             </Text>
           </View>
 
@@ -106,59 +95,76 @@ export default function IngredientsAvoidScreen() {
                   borderColor: themeColors.border,
                 },
               ]}
-              placeholder="Search and add ingredients..."
+              placeholder="Search foods..."
               placeholderTextColor={themeColors.textSecondary}
-              value={searchText}
-              onChangeText={setSearchText}
-              onSubmitEditing={handleAddCustomIngredient}
+              value={query}
+              onChangeText={setQuery}
               returnKeyType="done"
             />
-            {searchText.trim() && (
-              <TouchableOpacity
-                style={[styles.addButton, { backgroundColor: themeColors.primary }]}
-                onPress={handleAddCustomIngredient}>
-                <Text variant="body" weight="bold" style={{ color: themeColors.textInverse }}>
-                  Add
-                </Text>
-              </TouchableOpacity>
+            {isLoading && (
+              <View style={styles.loadingIndicator}>
+                <ActivityIndicator size="small" color={themeColors.primary} />
+              </View>
             )}
           </View>
 
+          {/* Error State */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <MaterialIcons name="cloud-off" size={20} color={themeColors.textSecondary} />
+              <Text variant="caption" color="secondary" style={styles.errorText}>
+                {error}
+              </Text>
+            </View>
+          )}
+
+          {/* No Results (backend returned 0 — no free-text add allowed) */}
+          {hasNoResults && (
+            <View style={styles.noResults}>
+              <Text variant="body" color="secondary">
+                No matches found for &quot;{query}&quot;
+              </Text>
+            </View>
+          )}
+
           {/* Ingredient Options */}
           <View style={styles.optionsContainer}>
-            {allIngredients.map((ingredient) => {
-              const isSelected = selectedIngredients.has(ingredient);
-              return (
-                <TouchableOpacity
-                  key={ingredient}
+            {displayItems.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.ingredientChip,
+                  {
+                    backgroundColor: item.isSelected
+                      ? themeColors.primary
+                      : themeColors.backgroundSecondary,
+                    borderColor: item.isSelected
+                      ? themeColors.primary
+                      : themeColors.border,
+                    borderWidth: 1,
+                  },
+                ]}
+                onPress={() => {
+                  if (item.isSelected) {
+                    handleToggleIngredient(item.name);
+                  } else {
+                    handleSelectFromSearch(item);
+                  }
+                }}
+                activeOpacity={0.7}>
+                <Text
+                  variant="body"
+                  weight={item.isSelected ? 'semibold' : 'normal'}
                   style={[
-                    styles.ingredientChip,
+                    styles.chipText,
                     {
-                      backgroundColor: isSelected
-                        ? themeColors.primary
-                        : themeColors.backgroundSecondary,
-                      borderColor: isSelected
-                        ? themeColors.primary
-                        : themeColors.border,
-                      borderWidth: 1,
+                      color: item.isSelected ? themeColors.textInverse : themeColors.text,
                     },
-                  ]}
-                  onPress={() => handleToggleIngredient(ingredient)}
-                  activeOpacity={0.7}>
-                  <Text
-                    variant="body"
-                    weight={isSelected ? 'semibold' : 'normal'}
-                    style={[
-                      styles.chipText,
-                      {
-                        color: isSelected ? themeColors.textInverse : themeColors.text,
-                      },
-                    ]}>
-                    {ingredient}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                  ]}>
+                  {item.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       </ScrollView>
@@ -210,6 +216,7 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
     marginBottom: spacing.lg,
   },
@@ -221,11 +228,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     fontSize: 16,
   },
-  addButton: {
-    paddingHorizontal: spacing.lg,
+  loadingIndicator: {
+    position: 'absolute',
+    right: spacing.lg,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  errorText: {
+    flex: 1,
+  },
+  noResults: {
     paddingVertical: spacing.md,
-    borderRadius: radius.lg,
-    justifyContent: 'center',
+    alignItems: 'center',
   },
   optionsContainer: {
     flexDirection: 'row',

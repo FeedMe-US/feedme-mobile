@@ -169,11 +169,9 @@ export function onboardingDataToProfile(data: OnboardingData) {
     dinner: data.mealTimes.dinner,
   } : undefined;
 
-  // Combine allergies and ingredients to avoid into allergen_exclusions
-  const allergenExclusions = [
-    ...(data.allergies || []),
-    ...(data.ingredientsAvoid || []),
-  ];
+  // Allergens are safety (hard filter) — backend contract IDs only
+  // Dislikes (ingredientsAvoid) are preference (soft filter) — stored separately
+  const allergenExclusions = data.allergies || [];
 
   return {
     age: data.age,
@@ -185,6 +183,7 @@ export function onboardingDataToProfile(data: OnboardingData) {
     goal_type: data.goal ? goalMap[data.goal] : undefined,
     dietary_restrictions: data.dietaryRequirements || [],
     allergen_exclusions: allergenExclusions,
+    ingredients_avoid: data.ingredientsAvoid || [],
     preferred_locations: preferredLocationIds,
     meals_per_day: data.mealsPerDay,
     meal_times: mealTimes,

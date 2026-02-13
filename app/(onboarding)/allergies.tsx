@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -8,72 +8,63 @@ import { Button } from '@/src/ui/Button';
 import { Screen } from '@/src/ui/Screen';
 import { MaterialIcons } from '@expo/vector-icons';
 import { saveOnboardingData } from '@/src/lib/onboardingData';
+import { ALLERGEN_OPTIONS } from '@/src/constants/preferences';
 
-type AllergyOption = 'peanuts' | 'tree-nuts' | 'dairy' | 'gluten' | 'shellfish' | 'soy' | 'eggs' | 'fish' | 'beef' | 'pork';
-
-const allergyOptions: { id: AllergyOption; name: string }[] = [
-  { id: 'peanuts', name: 'Peanuts' },
-  { id: 'tree-nuts', name: 'Tree Nuts' },
-  { id: 'dairy', name: 'Dairy' },
-  { id: 'gluten', name: 'Gluten' },
-  { id: 'shellfish', name: 'Shellfish' },
-  { id: 'soy', name: 'Soy' },
-  { id: 'eggs', name: 'Eggs' },
-  { id: 'fish', name: 'Fish' },
-  { id: 'beef', name: 'Beef' },
-  { id: 'pork', name: 'Pork' },
-];
+/**
+ * Filter allergens locally by matching query against name and synonyms.
+ * No API call — allergens are a fixed taxonomy.
+ */
+function filterAllergens(query: string) {
+  if (!query.trim()) return ALLERGEN_OPTIONS;
+  const lower = query.trim().toLowerCase();
+  return ALLERGEN_OPTIONS.filter(
+    (a) =>
+      a.name.toLowerCase().includes(lower) ||
+      a.id.toLowerCase().includes(lower) ||
+      a.synonyms.some((s) => s.toLowerCase().includes(lower))
+  );
+}
 
 export default function AllergiesScreen() {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light'];
   const router = useRouter();
-  const [selectedAllergies, setSelectedAllergies] = useState<Set<string>>(new Set());
-  const [searchText, setSearchText] = useState('');
-  const [customAllergies, setCustomAllergies] = useState<string[]>([]);
+  const [selectedAllergens, setSelectedAllergens] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState('');
 
-  const handleToggleAllergy = (allergyId: string) => {
-    const newSelection = new Set(selectedAllergies);
-    if (newSelection.has(allergyId)) {
-      newSelection.delete(allergyId);
+  const filteredOptions = useMemo(() => filterAllergens(query), [query]);
+
+  const handleToggle = (id: string) => {
+    const next = new Set(selectedAllergens);
+    if (next.has(id)) {
+      next.delete(id);
     } else {
-      newSelection.add(allergyId);
+      next.add(id);
     }
-    setSelectedAllergies(newSelection);
-  };
-
-  const handleAddCustomAllergy = () => {
-    const trimmedText = searchText.trim();
-    if (!trimmedText) return;
-
-    // Check if allergy already exists (case-insensitive)
-    const allAllergies = [...allergyOptions.map(a => a.name), ...customAllergies];
-    const existingAllergy = allAllergies.find(
-      (allergy) => allergy.toLowerCase() === trimmedText.toLowerCase()
-    );
-
-    if (existingAllergy) {
-      // Select the existing allergy instead of adding duplicate
-      handleToggleAllergy(existingAllergy);
-      setSearchText('');
-    } else if (!customAllergies.includes(trimmedText)) {
-      // Only add if it's truly new
-      setCustomAllergies([...customAllergies, trimmedText]);
-      setSelectedAllergies(new Set([...selectedAllergies, trimmedText]));
-      setSearchText('');
-    }
+    setSelectedAllergens(next);
   };
 
   const handleContinue = async () => {
-    const allSelected = Array.from(selectedAllergies);
-    await saveOnboardingData({ allergies: allSelected });
+    // Store backend-contract IDs (e.g. 'wheat', 'tree_nuts')
+    await saveOnboardingData({ allergies: Array.from(selectedAllergens) });
     router.push('/(onboarding)/ingredients-avoid');
   };
 
-  const allAllergies = [
-    ...allergyOptions.map(a => ({ id: a.id, name: a.name, isCustom: false })),
-    ...customAllergies.map(name => ({ id: name, name, isCustom: true })),
+  // Build display: selected items not in filtered results shown first, then filtered results
+  const filteredIds = new Set(filteredOptions.map((a) => a.id));
+  const extraSelected = Array.from(selectedAllergens)
+    .filter((id) => !filteredIds.has(id))
+    .map((id) => {
+      const opt = ALLERGEN_OPTIONS.find((a) => a.id === id);
+      return { id, name: opt?.name ?? id, isSelected: true };
+    });
+
+  const displayItems = [
+    ...extraSelected,
+    ...filteredOptions.map((a) => ({ id: a.id, name: a.name, isSelected: selectedAllergens.has(a.id) })),
   ];
+
+  const hasNoResults = query.trim().length > 0 && filteredOptions.length === 0;
 
   return (
     <Screen>
@@ -104,7 +95,7 @@ export default function AllergiesScreen() {
               </Text>
             </View>
 
-            {/* Search Bar - Moved to top */}
+            {/* Search Bar */}
             <View style={styles.searchContainer}>
               <TextInput
                 style={[
@@ -115,59 +106,62 @@ export default function AllergiesScreen() {
                     borderColor: themeColors.border,
                   },
                 ]}
-                placeholder="Search and add allergies..."
+                placeholder="Search allergies..."
                 placeholderTextColor={themeColors.textSecondary}
-                value={searchText}
-                onChangeText={setSearchText}
-                onSubmitEditing={handleAddCustomAllergy}
+                value={query}
+                onChangeText={setQuery}
                 returnKeyType="done"
               />
-              {searchText.trim() && (
-                <TouchableOpacity
-                  style={[styles.addButton, { backgroundColor: themeColors.primary }]}
-                  onPress={handleAddCustomAllergy}>
-                  <Text variant="body" weight="bold" style={{ color: themeColors.textInverse }}>
-                    Add
-                  </Text>
-                </TouchableOpacity>
-              )}
             </View>
+
+            {/* No Results */}
+            {hasNoResults && (
+              <View style={styles.noResults}>
+                <Text variant="body" color="secondary">
+                  No matching allergens for &quot;{query}&quot;
+                </Text>
+              </View>
+            )}
 
             {/* Allergy Options */}
             <View style={styles.optionsContainer}>
-              {allAllergies.map((allergy) => {
-                const isSelected = selectedAllergies.has(allergy.name);
-                return (
-                  <TouchableOpacity
-                    key={allergy.id}
+              {displayItems.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.allergyChip,
+                    {
+                      backgroundColor: item.isSelected
+                        ? themeColors.text
+                        : themeColors.backgroundSecondary,
+                      borderColor: item.isSelected
+                        ? themeColors.text
+                        : themeColors.border,
+                      borderWidth: 1,
+                    },
+                  ]}
+                  onPress={() => handleToggle(item.id)}
+                  activeOpacity={0.7}>
+                  <Text
+                    variant="body"
+                    weight={item.isSelected ? 'semibold' : 'normal'}
                     style={[
-                      styles.allergyChip,
+                      styles.chipText,
                       {
-                        backgroundColor: isSelected
-                          ? themeColors.text
-                          : themeColors.backgroundSecondary,
-                        borderColor: isSelected
-                          ? themeColors.text
-                          : themeColors.border,
-                        borderWidth: 1,
+                        color: item.isSelected ? themeColors.textInverse : themeColors.text,
                       },
-                    ]}
-                    onPress={() => handleToggleAllergy(allergy.name)}
-                    activeOpacity={0.7}>
-                    <Text
-                      variant="body"
-                      weight={isSelected ? 'semibold' : 'normal'}
-                      style={[
-                        styles.chipText,
-                        {
-                          color: isSelected ? themeColors.textInverse : themeColors.text,
-                        },
-                      ]}>
-                      {allergy.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                    ]}>
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Helper text + link to Foods to Avoid */}
+            <View style={styles.helperContainer}>
+              <Text variant="caption" color="secondary" style={styles.helperText}>
+                For other sensitivities (e.g., beetroot), add them under Foods to Avoid.
+              </Text>
             </View>
           </View>
         </ScrollView>
@@ -223,6 +217,7 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
     marginBottom: spacing.lg,
   },
@@ -234,17 +229,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     fontSize: 16,
   },
-  addButton: {
-    paddingHorizontal: spacing.lg,
+  noResults: {
     paddingVertical: spacing.md,
-    borderRadius: radius.lg,
-    justifyContent: 'center',
+    alignItems: 'center',
   },
   optionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.md,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   allergyChip: {
     paddingHorizontal: spacing.lg,
@@ -255,6 +248,13 @@ const styles = StyleSheet.create({
   },
   chipText: {
     textAlign: 'center',
+  },
+  helperContainer: {
+    marginBottom: spacing.xl,
+  },
+  helperText: {
+    fontStyle: 'italic',
+    lineHeight: 18,
   },
   buttonContainer: {
     paddingHorizontal: spacing.lg,

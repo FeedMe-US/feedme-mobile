@@ -1,11 +1,12 @@
 /**
- * AllergenPickerModal - Modal for selecting allergens from standard list
+ * AllergenPickerModal - Modal for selecting allergens from the fixed FDA taxonomy
  *
  * Per §3.1 of BEHAVIORAL_CONTRACT.md:
- * Users can select from FDA's top 9 major food allergens
+ * Users select from the 9 major food allergens. No arbitrary custom input.
+ * IDs match backend contract: wheat, milk, eggs, fish, shellfish, tree_nuts, peanuts, soy, sesame
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Modal,
@@ -21,13 +22,29 @@ import { colors, spacing, radius } from '@/src/theme';
 import { Text } from '@/src/ui/Text';
 import { Button } from '@/src/ui/Button';
 import { MaterialIcons } from '@expo/vector-icons';
-import { ALLERGEN_OPTIONS, AllergenId } from './AllergenSection';
+import { ALLERGEN_OPTIONS, AllergenOption } from '@/src/constants/preferences';
 
 interface AllergenPickerModalProps {
   visible: boolean;
   onClose: () => void;
   selectedAllergens: string[];
   onSave: (allergens: string[]) => void;
+  /** Optional: callback to navigate to disliked foods */
+  onNavigateToFoodsToAvoid?: () => void;
+}
+
+/**
+ * Filter allergens locally by matching query against name, id, and synonyms.
+ */
+function filterAllergens(query: string): AllergenOption[] {
+  if (!query.trim()) return [...ALLERGEN_OPTIONS];
+  const lower = query.trim().toLowerCase();
+  return ALLERGEN_OPTIONS.filter(
+    (a) =>
+      a.name.toLowerCase().includes(lower) ||
+      a.id.toLowerCase().includes(lower) ||
+      a.synonyms.some((s) => s.toLowerCase().includes(lower))
+  );
 }
 
 export function AllergenPickerModal({
@@ -35,18 +52,21 @@ export function AllergenPickerModal({
   onClose,
   selectedAllergens: initialSelected,
   onSave,
+  onNavigateToFoodsToAvoid,
 }: AllergenPickerModalProps) {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light'];
 
   const [selected, setSelected] = useState<Set<string>>(new Set(initialSelected));
-  const [customAllergen, setCustomAllergen] = useState('');
+  const [query, setQuery] = useState('');
+
+  const filteredOptions = useMemo(() => filterAllergens(query), [query]);
 
   // Reset state when modal opens
   React.useEffect(() => {
     if (visible) {
       setSelected(new Set(initialSelected));
-      setCustomAllergen('');
+      setQuery('');
     }
   }, [visible, initialSelected]);
 
@@ -60,20 +80,12 @@ export function AllergenPickerModal({
     setSelected(newSelected);
   };
 
-  const handleAddCustom = () => {
-    const trimmed = customAllergen.trim().toLowerCase();
-    if (trimmed && !selected.has(trimmed)) {
-      const newSelected = new Set(selected);
-      newSelected.add(trimmed);
-      setSelected(newSelected);
-      setCustomAllergen('');
-    }
-  };
-
   const handleSave = () => {
     onSave(Array.from(selected));
     onClose();
   };
+
+  const hasNoResults = query.trim().length > 0 && filteredOptions.length === 0;
 
   return (
     <Modal
@@ -111,14 +123,41 @@ export function AllergenPickerModal({
           </Text>
         </View>
 
+        {/* Search Bar */}
+        <View style={styles.searchBarContainer}>
+          <TextInput
+            style={[
+              styles.searchInput,
+              {
+                backgroundColor: themeColors.backgroundSecondary,
+                color: themeColors.text,
+                borderColor: themeColors.border,
+              },
+            ]}
+            placeholder="Search allergens..."
+            placeholderTextColor={themeColors.textSecondary}
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="done"
+          />
+        </View>
+
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           {/* Standard Allergens */}
           <Text variant="caption" color="secondary" style={styles.sectionLabel}>
             COMMON ALLERGENS (FDA TOP 9)
           </Text>
 
+          {hasNoResults && (
+            <View style={styles.noResults}>
+              <Text variant="body" color="secondary">
+                No matching allergens for &quot;{query}&quot;
+              </Text>
+            </View>
+          )}
+
           <View style={styles.optionsGrid}>
-            {ALLERGEN_OPTIONS.map((option) => {
+            {filteredOptions.map((option) => {
               const isSelected = selected.has(option.id);
               return (
                 <TouchableOpacity
@@ -135,13 +174,12 @@ export function AllergenPickerModal({
                   onPress={() => toggleAllergen(option.id)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.optionEmoji}>{option.emoji}</Text>
                   <Text
                     variant="body"
                     weight={isSelected ? 'semibold' : 'normal'}
                     style={{ color: isSelected ? themeColors.textInverse : themeColors.text }}
                   >
-                    {option.label}
+                    {option.name}
                   </Text>
                   {isSelected && (
                     <MaterialIcons
@@ -156,64 +194,26 @@ export function AllergenPickerModal({
             })}
           </View>
 
-          {/* Custom Allergen Input */}
-          <Text variant="caption" color="secondary" style={styles.sectionLabel}>
-            OTHER ALLERGEN
-          </Text>
-
-          <View style={styles.customInputContainer}>
-            <TextInput
-              style={[
-                styles.customInput,
-                {
-                  backgroundColor: themeColors.backgroundSecondary,
-                  color: themeColors.text,
-                  borderColor: themeColors.border,
-                },
-              ]}
-              placeholder="Add custom allergen..."
-              placeholderTextColor={themeColors.textSecondary}
-              value={customAllergen}
-              onChangeText={setCustomAllergen}
-              onSubmitEditing={handleAddCustom}
-              returnKeyType="done"
-            />
-            {customAllergen.trim() && (
+          {/* Helper text + link to Foods to Avoid */}
+          <View style={styles.helperContainer}>
+            <Text variant="caption" color="secondary" style={styles.helperText}>
+              For other sensitivities (e.g., beetroot), add them under Foods to Avoid.
+            </Text>
+            {onNavigateToFoodsToAvoid && (
               <TouchableOpacity
-                style={[styles.addButton, { backgroundColor: themeColors.primary }]}
-                onPress={handleAddCustom}
+                onPress={() => {
+                  onClose();
+                  onNavigateToFoodsToAvoid();
+                }}
+                style={styles.linkButton}
               >
-                <MaterialIcons name="add" size={20} color={themeColors.textInverse} />
+                <Text variant="caption" color="primary" weight="semibold">
+                  Go to Foods to Avoid
+                </Text>
+                <MaterialIcons name="arrow-forward" size={14} color={themeColors.primary} />
               </TouchableOpacity>
             )}
           </View>
-
-          {/* Custom allergens that were added */}
-          {Array.from(selected).filter(
-            (id) => !ALLERGEN_OPTIONS.some((o) => o.id === id)
-          ).length > 0 && (
-            <View style={styles.customList}>
-              <Text variant="caption" color="secondary" style={styles.sectionLabel}>
-                YOUR CUSTOM ALLERGENS
-              </Text>
-              <View style={styles.customChips}>
-                {Array.from(selected)
-                  .filter((id) => !ALLERGEN_OPTIONS.some((o) => o.id === id))
-                  .map((id) => (
-                    <TouchableOpacity
-                      key={id}
-                      style={[styles.customChip, { backgroundColor: themeColors.primary }]}
-                      onPress={() => toggleAllergen(id)}
-                    >
-                      <Text variant="body" weight="medium" style={{ color: themeColors.textInverse }}>
-                        {id}
-                      </Text>
-                      <MaterialIcons name="close" size={16} color={themeColors.textInverse} />
-                    </TouchableOpacity>
-                  ))}
-              </View>
-            </View>
-          )}
         </ScrollView>
 
         {/* Save Button */}
@@ -251,6 +251,18 @@ const styles = StyleSheet.create({
   warningText: {
     flex: 1,
   },
+  searchBarContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  searchInput: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    fontSize: 16,
+  },
   scrollView: {
     flex: 1,
   },
@@ -263,6 +275,10 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  noResults: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
   optionsGrid: {
     gap: spacing.sm,
   },
@@ -274,46 +290,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: spacing.sm,
   },
-  optionEmoji: {
-    fontSize: 20,
-  },
   checkIcon: {
     marginLeft: 'auto',
   },
-  customInputContainer: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+  helperContainer: {
+    marginTop: spacing.xl,
+    paddingTop: spacing.md,
   },
-  customInput: {
-    flex: 1,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    fontSize: 16,
+  helperText: {
+    fontStyle: 'italic',
+    lineHeight: 18,
   },
-  addButton: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  customList: {
-    marginTop: spacing.lg,
-  },
-  customChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  customChip: {
+  linkButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.full,
     gap: spacing.xs,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   footer: {
     padding: spacing.lg,

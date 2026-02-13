@@ -1,11 +1,13 @@
 /**
- * ItemManagementModal - Professional modal for managing allergens or disliked foods
- * 
+ * ItemManagementModal - Modal for managing allergens or disliked foods
+ *
  * Features:
- * - Proper keyboard handling
- * - Search functionality
- * - Add/remove items
- * - Professional UI
+ * - Backend-powered search via useItemSearch hook
+ * - Debounced API queries with loading states
+ * - Deduplication of suggestions
+ * - No arbitrary custom items — only backend-matched or default items
+ * - Error state surfaced (no silent fallback to local data)
+ * - No free-text add when backend returns 0 results
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -19,6 +21,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  ActivityIndicator,
 } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors, spacing, radius } from '@/src/theme';
@@ -26,6 +29,7 @@ import { Text } from '@/src/ui/Text';
 import { Button } from '@/src/ui/Button';
 import { MaterialIcons } from '@expo/vector-icons';
 import { haptics } from '@/src/utils/haptics';
+import { useItemSearch, SearchItem } from '@/src/hooks/useItemSearch';
 
 export interface ItemOption {
   id: string;
@@ -38,13 +42,13 @@ interface ItemManagementModalProps {
   onClose: () => void;
   title: string;
   subtitle?: string;
-  selectedItems: string[]; // Array of IDs or names
-  standardOptions: ItemOption[]; // Standard options to show
-  customItems: string[]; // Custom items that were added
-  onSave: (selectedItems: string[], customItems: string[]) => void; // Return both
+  selectedItems: string[]; // Array of names
+  standardOptions: ItemOption[]; // Default options to show
+  customItems: string[]; // Legacy custom items (displayed but no new ones can be added)
+  onSave: (selectedItems: string[], customItems: string[]) => void;
   placeholder?: string;
   addButtonLabel?: string;
-  isDislikedFoods?: boolean; // Special handling for disliked foods
+  isDislikedFoods?: boolean;
 }
 
 export function ItemManagementModal({
@@ -56,8 +60,7 @@ export function ItemManagementModal({
   standardOptions,
   customItems: initialCustomItems,
   onSave,
-  placeholder = 'Search or add new item...',
-  addButtonLabel = 'Add',
+  placeholder = 'Search items...',
   isDislikedFoods = false,
 }: ItemManagementModalProps) {
   const colorScheme = useColorScheme();
@@ -65,15 +68,26 @@ export function ItemManagementModal({
 
   const [selected, setSelected] = useState<Set<string>>(new Set(initialSelected));
   const [customItems, setCustomItems] = useState<string[]>(initialCustomItems);
-  const [searchText, setSearchText] = useState('');
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  // Convert standardOptions to SearchItem format for the hook
+  // Memoize to prevent infinite re-render loop (unstable reference triggers useEffect)
+  const defaults: SearchItem[] = useMemo(
+    () => standardOptions.map(opt => ({ id: opt.id, name: opt.name })),
+    [standardOptions]
+  );
+
+  const { query, setQuery, results, isLoading, hasNoResults, error } = useItemSearch({
+    defaults,
+    debounceMs: 300,
+  });
 
   // Reset state when modal opens
   useEffect(() => {
     if (visible) {
       setSelected(new Set(initialSelected));
       setCustomItems(initialCustomItems);
-      setSearchText('');
+      setQuery('');
     }
   }, [visible, initialSelected, initialCustomItems]);
 
@@ -94,33 +108,20 @@ export function ItemManagementModal({
     };
   }, []);
 
-  // Filter options based on search
-  const filteredStandardOptions = useMemo(() => {
-    if (!searchText.trim()) return standardOptions;
-    const searchLower = searchText.toLowerCase();
-    return standardOptions.filter(
-      opt => opt.name.toLowerCase().includes(searchLower) || opt.id.toLowerCase().includes(searchLower)
-    );
-  }, [standardOptions, searchText]);
-
-  const filteredCustomItems = useMemo(() => {
-    if (!searchText.trim()) return customItems;
-    const searchLower = searchText.toLowerCase();
+  // Filter custom items by search query
+  const filteredCustomItems = (() => {
+    if (!query.trim()) return customItems;
+    const searchLower = query.toLowerCase();
     return customItems.filter(item => item.toLowerCase().includes(searchLower));
-  }, [customItems, searchText]);
+  })();
 
-  // Check if search has no results
-  const hasNoSearchResults = searchText.trim().length > 0 && 
-    filteredStandardOptions.length === 0 && 
-    filteredCustomItems.length === 0;
-
-  const toggleItem = (id: string) => {
+  const toggleItem = (name: string) => {
     haptics.light();
     const newSelected = new Set(selected);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
+    if (newSelected.has(name)) {
+      newSelected.delete(name);
     } else {
-      newSelected.add(id);
+      newSelected.add(name);
     }
     setSelected(newSelected);
   };
@@ -131,46 +132,6 @@ export function ItemManagementModal({
     newSelected.delete(item);
     setSelected(newSelected);
     setCustomItems(customItems.filter(i => i !== item));
-  };
-
-  const handleAddFromSearch = () => {
-    const trimmed = searchText.trim();
-    if (!trimmed) return;
-
-    // Check if it matches a standard option
-    const matchingOption = standardOptions.find(
-      opt => opt.name.toLowerCase() === trimmed.toLowerCase() || opt.id.toLowerCase() === trimmed.toLowerCase()
-    );
-
-    if (matchingOption) {
-      // Select the matching standard option instead
-      if (!selected.has(matchingOption.id)) {
-        toggleItem(matchingOption.id);
-      }
-      setSearchText('');
-      Keyboard.dismiss();
-      return;
-    }
-
-    // Check if custom item already exists
-    if (customItems.some(item => item.toLowerCase() === trimmed.toLowerCase())) {
-      // Select existing custom item
-      if (!selected.has(trimmed)) {
-        toggleItem(trimmed);
-      }
-      setSearchText('');
-      Keyboard.dismiss();
-      return;
-    }
-
-    // Add as new custom item
-    haptics.success();
-    setCustomItems([...customItems, trimmed]);
-    const newSelected = new Set(selected);
-    newSelected.add(trimmed);
-    setSelected(newSelected);
-    setSearchText('');
-    Keyboard.dismiss();
   };
 
   const handleSave = () => {
@@ -184,6 +145,10 @@ export function ItemManagementModal({
     JSON.stringify(allSelectedItems.sort()) !== JSON.stringify(initialSelected.sort()) ||
     JSON.stringify(customItems.sort()) !== JSON.stringify(initialCustomItems.sort());
   const canSave = hasChanges;
+
+  // Deduplicate: remove results whose names match custom items
+  const customNamesLower = new Set(customItems.map(c => c.toLowerCase()));
+  const deduplicatedResults = results.filter(r => !customNamesLower.has(r.name.toLowerCase()));
 
   return (
     <Modal
@@ -235,16 +200,19 @@ export function ItemManagementModal({
                 style={[styles.searchInput, { color: themeColors.text }]}
                 placeholder={placeholder}
                 placeholderTextColor={themeColors.textSecondary}
-                value={searchText}
-                onChangeText={setSearchText}
+                value={query}
+                onChangeText={setQuery}
                 returnKeyType="search"
                 autoCapitalize="none"
                 autoCorrect={false}
               />
-              {searchText.length > 0 && (
+              {isLoading && (
+                <ActivityIndicator size="small" color={themeColors.primary} style={{ marginRight: spacing.xs }} />
+              )}
+              {query.length > 0 && !isLoading && (
                 <TouchableOpacity
                   onPress={() => {
-                    setSearchText('');
+                    setQuery('');
                     Keyboard.dismiss();
                   }}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -252,17 +220,6 @@ export function ItemManagementModal({
                 </TouchableOpacity>
               )}
             </View>
-            {hasNoSearchResults && searchText.trim().length > 0 && (
-              <TouchableOpacity
-                style={[styles.addButton, { backgroundColor: themeColors.primary }]}
-                onPress={handleAddFromSearch}
-                activeOpacity={0.8}>
-                <MaterialIcons name="add" size={20} color="#FFFFFF" />
-                <Text variant="body" weight="semibold" style={styles.addButtonText}>
-                  Add
-                </Text>
-              </TouchableOpacity>
-            )}
           </View>
         </View>
 
@@ -271,18 +228,28 @@ export function ItemManagementModal({
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={true}>
-          {/* Standard Options */}
-          {filteredStandardOptions.length > 0 && (
+          {/* Error State */}
+          {error && (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="cloud-off" size={36} color={themeColors.textSecondary} />
+              <Text variant="body" color="secondary" style={styles.emptyText}>
+                {error}
+              </Text>
+            </View>
+          )}
+
+          {/* Search Results / Standard Options */}
+          {!error && deduplicatedResults.length > 0 && (
             <View style={styles.section}>
               <Text variant="caption" color="secondary" style={styles.sectionLabel}>
-                STANDARD OPTIONS
+                {query.trim() ? 'SEARCH RESULTS' : 'STANDARD OPTIONS'}
               </Text>
               <View style={styles.optionsList}>
-                {filteredStandardOptions.map((option) => {
-                  const isSelected = selected.has(option.id);
+                {deduplicatedResults.map((item) => {
+                  const isSelected = selected.has(item.name);
                   return (
                     <TouchableOpacity
-                      key={option.id}
+                      key={item.id}
                       style={[
                         styles.optionRow,
                         {
@@ -292,14 +259,13 @@ export function ItemManagementModal({
                           borderColor: isSelected ? themeColors.primary : themeColors.border,
                         },
                       ]}
-                      onPress={() => toggleItem(option.id)}
+                      onPress={() => toggleItem(item.name)}
                       activeOpacity={0.7}>
-                      {option.emoji && <Text style={styles.optionEmoji}>{option.emoji}</Text>}
                       <Text
                         variant="body"
                         weight={isSelected ? 'semibold' : 'normal'}
                         style={[styles.optionText, { color: isSelected ? themeColors.primary : themeColors.text }]}>
-                        {option.name}
+                        {item.name}
                       </Text>
                       {isSelected && (
                         <MaterialIcons
@@ -316,7 +282,7 @@ export function ItemManagementModal({
             </View>
           )}
 
-          {/* Custom Items */}
+          {/* Legacy Custom Items (previously added, still editable) */}
           {filteredCustomItems.length > 0 && (
             <View style={styles.section}>
               <Text variant="caption" color="secondary" style={styles.sectionLabel}>
@@ -370,23 +336,21 @@ export function ItemManagementModal({
           )}
 
           {/* Empty State - No search */}
-          {!searchText && filteredStandardOptions.length === 0 && filteredCustomItems.length === 0 && (
+          {!query && !error && deduplicatedResults.length === 0 && filteredCustomItems.length === 0 && (
             <View style={styles.emptyState}>
               <MaterialIcons name="inbox" size={48} color={themeColors.textSecondary} />
               <Text variant="body" color="secondary" style={styles.emptyText}>
-                No items yet. Search above to add items.
+                No items yet. Search above to find items.
               </Text>
             </View>
           )}
 
           {/* Empty State - Search with no results */}
-          {hasNoSearchResults && (
+          {hasNoResults && filteredCustomItems.length === 0 && (
             <View style={styles.emptyState}>
               <MaterialIcons name="search-off" size={48} color={themeColors.textSecondary} />
               <Text variant="body" color="secondary" style={styles.emptyText}>
-                {isDislikedFoods
-                  ? `"${searchText}" not found. Tap the Add button above to include it.`
-                  : `No results in our database for "${searchText}". Tap the Add button above to include it.`}
+                No matches found for &quot;{query}&quot;
               </Text>
             </View>
           )}
@@ -469,18 +433,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: spacing.sm,
   },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    gap: spacing.xs,
-    minHeight: 44,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-  },
   scrollView: {
     flex: 1,
   },
@@ -512,10 +464,6 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  optionEmoji: {
-    fontSize: 20,
-    marginRight: spacing.sm,
   },
   optionText: {
     flex: 1,

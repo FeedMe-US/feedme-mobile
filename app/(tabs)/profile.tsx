@@ -30,6 +30,8 @@ import { userService } from '@/src/services/userService';
 // TEMPORARILY REMOVED - Notification preferences feature
 // import DateTimePicker from '@react-native-community/datetimepicker';
 import { ItemManagementModal, ItemOption } from '@/src/components/settings/ItemManagementModal';
+import { AllergenPickerModal } from '@/src/components/settings/AllergenPickerModal';
+import { ALLERGEN_OPTIONS, DISLIKED_FOOD_OPTIONS } from '@/src/constants/preferences';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
@@ -71,33 +73,10 @@ export default function ProfileScreen() {
 
   const dietaryRestrictions = ['Vegetarian', 'Vegan', 'Pescatarian', 'Halal', 'Kosher', 'Gluten-free', 'None'];
 
-  // Allergen options from onboarding (matching allergies.tsx)
-  const allergenOptions: ItemOption[] = [
-    { id: 'peanuts', name: 'Peanuts' },
-    { id: 'tree-nuts', name: 'Tree Nuts' },
-    { id: 'dairy', name: 'Dairy' },
-    { id: 'gluten', name: 'Gluten' },
-    { id: 'shellfish', name: 'Shellfish' },
-    { id: 'soy', name: 'Soy' },
-    { id: 'eggs', name: 'Eggs' },
-    { id: 'fish', name: 'Fish' },
-    { id: 'beef', name: 'Beef' },
-    { id: 'pork', name: 'Pork' },
-  ];
-
-  // Disliked food options from onboarding (matching ingredients-avoid.tsx)
-  const dislikedFoodOptions = [
-    'Mushrooms',
-    'Cilantro',
-    'Olives',
-    'Spicy Food',
-    'Mayonnaise',
-    'Onions',
-    'Pickles',
-    'Blue Cheese',
-    'Anchovies',
-    'Tomatoes',
-  ];
+  // Use shared constants for allergen and disliked food options
+  // Map AllergenOption (with synonyms) to ItemOption for display
+  const allergenOptions: ItemOption[] = ALLERGEN_OPTIONS.map(a => ({ id: a.id, name: a.name }));
+  const dislikedFoodOptions = DISLIKED_FOOD_OPTIONS;
 
   // Mapping between display names and backend keys for micronutrients
   const vitaminDisplayToKey: Record<string, string> = {
@@ -154,7 +133,8 @@ export default function ProfileScreen() {
   );
 
   // Get custom disliked foods (not in standard list)
-  const customDislikedFoods = (dislikedFoods || []).filter(f => !dislikedFoodOptions.includes(f));
+  const dislikedFoodNames = dislikedFoodOptions.map(opt => opt.name);
+  const customDislikedFoods = (dislikedFoods || []).filter(f => !dislikedFoodNames.includes(f));
 
   // TEMPORARILY REMOVED - Notification preferences feature
   // const [reminderTimes, setReminderTimes] = useState<{
@@ -1628,7 +1608,7 @@ export default function ProfileScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.chipsContainer}>
               {/* Show all available options plus any custom ones from onboarding */}
-              {[...dislikedFoodOptions, ...customDislikedFoods].map((food) => (
+              {[...dislikedFoodNames, ...customDislikedFoods].map((food) => (
                 <Chip
                   key={food}
                   label={food}
@@ -2119,39 +2099,33 @@ export default function ProfileScreen() {
         />
       )} */}
 
-      {/* Allergen Management Modal */}
-      <ItemManagementModal
+      {/* Allergen Management Modal — fixed taxonomy, local-only search */}
+      <AllergenPickerModal
         visible={showAllergenModal}
         onClose={() => setShowAllergenModal(false)}
-        title="Allergies"
-        subtitle="Foods we'll never recommend for your safety"
-        selectedItems={allergenExclusions}
-        standardOptions={allergenOptions}
-        customItems={customAllergens}
-        onSave={(selectedItems, updatedCustomItems) => {
-          // Merge standard selections with custom items
-          const standardIds = selectedItems.filter(id => allergenOptions.find(opt => opt.id === id));
-          const customIds = selectedItems.filter(id => !allergenOptions.find(opt => opt.id === id));
-          setAllergenExclusions([...standardIds, ...customIds]);
+        selectedAllergens={allergenExclusions}
+        onSave={(allergens) => {
+          setAllergenExclusions(allergens);
         }}
-        placeholder="Search or add custom allergy..."
-        addButtonLabel="Add"
+        onNavigateToFoodsToAvoid={() => {
+          setShowAllergenModal(false);
+          setTimeout(() => setShowDislikedFoodModal(true), 300);
+        }}
       />
 
-      {/* Disliked Foods Management Modal */}
+      {/* Disliked Foods Management Modal — backend /food/search */}
       <ItemManagementModal
         visible={showDislikedFoodModal}
         onClose={() => setShowDislikedFoodModal(false)}
-        title="Disliked Foods"
+        title="Foods to Avoid"
         subtitle="Foods you'd rather skip (we'll deprioritize these)"
         selectedItems={dislikedFoods}
-        standardOptions={dislikedFoodOptions.map(food => ({ id: food, name: food }))}
+        standardOptions={dislikedFoodOptions}
         customItems={customDislikedFoods}
         onSave={(selectedItems, updatedCustomItems) => {
           setDislikedFoods(selectedItems);
         }}
-        placeholder="Search or add disliked food..."
-        addButtonLabel="Add"
+        placeholder="Search foods..."
         isDislikedFoods={true}
       />
     </Screen>

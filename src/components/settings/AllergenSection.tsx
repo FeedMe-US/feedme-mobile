@@ -35,12 +35,15 @@ interface AllergenSectionProps {
   onPressAddAllergen: () => void;
   /** Callback to remove a specific allergen */
   onRemoveAllergen: (allergenId: string) => void;
+  /** Optional: callback to navigate to the disliked foods modal */
+  onNavigateToFoodsToAvoid?: () => void;
 }
 
 export function AllergenSection({
   selectedAllergens,
   onPressAddAllergen,
   onRemoveAllergen,
+  onNavigateToFoodsToAvoid,
 }: AllergenSectionProps) {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light'];
@@ -124,6 +127,21 @@ export function AllergenSection({
           No allergens selected. Tap "Add Allergen" to add any food allergies.
         </Text>
       )}
+
+      {/* Helper text + link */}
+      <View style={styles.helperContainer}>
+        <Text variant="caption" color="secondary" style={styles.helperText}>
+          For other sensitivities (e.g., beetroot), add them under Foods to Avoid.
+        </Text>
+        {onNavigateToFoodsToAvoid && (
+          <TouchableOpacity onPress={onNavigateToFoodsToAvoid} style={styles.linkButton}>
+            <Text variant="caption" color="primary" weight="semibold">
+              Go to Foods to Avoid
+            </Text>
+            <MaterialIcons name="arrow-forward" size={14} color={themeColors.primary} />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -173,5 +191,19 @@ const styles = StyleSheet.create({
   emptyText: {
     marginTop: spacing.sm,
     fontStyle: 'italic',
+  },
+  helperContainer: {
+    marginTop: spacing.md,
+  },
+  helperText: {
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  linkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    paddingVertical: spacing.xs,
   },
 });
