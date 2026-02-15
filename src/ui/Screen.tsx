@@ -5,7 +5,7 @@
 import React from 'react';
 import { View, ViewProps, StyleSheet, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { usePathname } from 'expo-router';
+import { useSegments } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors } from '@/src/theme';
 import { OnboardingProgressBar } from './OnboardingProgressBar';
@@ -28,10 +28,16 @@ export function Screen({
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
-  const pathname = usePathname();
+  const segments = useSegments();
 
   // Check if we're in an onboarding screen
-  const isOnboarding = pathname.startsWith('/(onboarding)') && !pathname.includes('/complete');
+  // segments will be like ['(onboarding)', 'goal'] or ['(tabs)', 'index']
+  const isOnboarding = segments.length >= 2 && segments[0] === '(onboarding)' && segments[1] !== 'complete';
+
+  // Debug: Log segments to console
+  if (__DEV__) {
+    console.log('[Screen] segments:', segments, 'isOnboarding:', isOnboarding);
+  }
 
   const screenStyles: ViewStyle[] = [
     styles.base,

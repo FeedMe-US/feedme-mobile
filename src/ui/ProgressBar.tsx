@@ -44,6 +44,11 @@ export function ProgressBar({
   const fillColor = color || themeColors.primary;
   const trackColor = themeColors.border;
 
+  // Debug logging
+  if (__DEV__) {
+    console.log('[ProgressBar] currentStep:', currentStep, 'totalSteps:', totalSteps, 'progress:', progress, 'fillColor:', fillColor);
+  }
+
   return (
     <View style={styles.container}>
       <View

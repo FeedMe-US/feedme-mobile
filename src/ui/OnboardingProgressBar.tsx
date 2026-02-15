@@ -5,22 +5,27 @@
 
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { usePathname } from 'expo-router';
+import { useSegments } from 'expo-router';
 import { ProgressBar } from './ProgressBar';
 import { getStepIndex, TOTAL_STEPS } from '@/src/constants/onboarding';
 
 export function OnboardingProgressBar() {
-  const pathname = usePathname();
+  const segments = useSegments();
 
-  // Extract the route name from the pathname (e.g., "/(onboarding)/goal" -> "goal")
-  const routeName = pathname.split('/').pop() || '';
+  // Extract the route name from segments (e.g., ['(onboarding)', 'goal'] -> 'goal')
+  const routeName = segments.length >= 2 ? segments[1] : '';
 
-  // Don't show progress bar on complete screen
-  if (routeName === 'complete') {
+  // Don't show progress bar on complete screen or if no route
+  if (!routeName || routeName === 'complete') {
     return null;
   }
 
   const currentStepIndex = getStepIndex(routeName);
+
+  // Debug logging
+  if (__DEV__) {
+    console.log('[OnboardingProgressBar] segments:', segments, 'routeName:', routeName, 'stepIndex:', currentStepIndex);
+  }
 
   return (
     <View style={styles.container}>
