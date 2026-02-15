@@ -8,8 +8,6 @@ import { Chip } from '@/src/components/Chip';
 import { MacroRing } from '@/src/components/MacroRing';
 import { MealCard } from '@/src/components/MealCard';
 import { ClosedHallCard } from '@/src/components/ClosedHallCard';
-import { AppIcon } from '@/src/components/AppIcon';
-import { locationService } from '@/src/services/locationService';
 import { MealRecommendation, mealService, MealPeriod } from '@/src/services/mealService';
 import { useDailyTracking } from '@/src/store/DailyTrackingContext';
 import { colors, spacing, radius } from '@/src/theme';
@@ -27,6 +25,7 @@ import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, TextInput, Activ
 import { userService } from '@/src/services/userService';
 import { getOnboardingData } from '@/src/lib/onboardingData';
 import type { DiningHall } from '@/src/services/mealService';
+import { getMRUOrder, getLastSelectedHall, selectDiningHall, sortByMRU } from '@/src/lib/diningHallHistory';
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
@@ -35,12 +34,11 @@ export default function HomeScreen() {
   const params = useLocalSearchParams();
   const { tracking, addMeal, refreshFromBackend } = useDailyTracking();
 
-  // Hall selection state - default to "Any Hill" mode so content shows on scroll
+  // Hall selection state - no default selection until user taps
   const [selectedHallSlug, setSelectedHallSlug] = useState<string | null>(null);
-  const [selectedHallMode, setSelectedHallMode] = useState<'specific' | 'hill' | 'campus'>('hill');
+  const [selectedHallMode, setSelectedHallMode] = useState<'specific' | 'hill' | 'campus'>('specific');
   const [diningHalls, setDiningHalls] = useState<string[]>([]);
   const [diningHallsData, setDiningHallsData] = useState<Map<string, DiningHall>>(new Map());
-  const [closestHallSlug, setClosestHallSlug] = useState<string | null>(null);
 
   // Meal period and mood selection
   const [selectedMealPeriod, setSelectedMealPeriod] = useState<MealPeriod | null>(null);
@@ -286,16 +284,14 @@ export default function HomeScreen() {
     }
   }, [params, router]);
 
-  // Auto-select "Any Hill" and current meal period on mount
+  // Set current meal period on mount (but don't auto-select a hall)
   useEffect(() => {
-    if (!isInitialized && diningHalls.length > 0 && params.buildPlate !== 'true') {
-      setSelectedHallMode('hill');
-      setSelectedHallSlug(null);
+    if (!isInitialized && diningHalls.length > 0 && params.buildPlate !== 'true' && !selectedHallSlug) {
       const currentPeriod = getCurrentMealPeriod();
       setSelectedMealPeriod(currentPeriod);
-      setIsInitialized(true);
+      // Don't set isInitialized here - only set it when a hall is actually selected
     }
-  }, [diningHalls.length, isInitialized, getCurrentMealPeriod, params.buildPlate]);
+  }, [diningHalls.length, isInitialized, getCurrentMealPeriod, params.buildPlate, selectedHallSlug]);
 
   // Auto-generate recommendation when hall or meal period changes (but not mood)
   useEffect(() => {
@@ -334,9 +330,6 @@ useFocusEffect(
   useCallback(() => {
     const loadDiningHalls = async () => {
     try {
-      // Get user location for finding closest hall
-      const userLocation = await locationService.getCurrentLocation();
-      
       // Get all dining halls from the API
       const allHalls = await mealService.getDiningHalls();
       console.log('[Home] Loaded', allHalls.length, 'dining halls from API');
@@ -468,29 +461,15 @@ useFocusEffect(
         return a.name.localeCompare(b.name);
       });
 
-      // Find closest hall if user location is available
-      let closestSlug: string | null = null;
-      if (userLocation) {
-        const sortedByDistance = await mealService.getDiningHallsSorted(
-          userLocation.latitude,
-          userLocation.longitude,
-          preferredSlugs
-        );
-        // Get the closest hall that's in our preferred halls list
-        const closestHall = sortedByDistance.find(hall => 
-          preferredHalls.some(ph => ph.slug === hall.slug)
-        );
-        if (closestHall) {
-          closestSlug = closestHall.slug;
-        }
-      }
+      // Get MRU order from storage
+      const mruOrder = await getMRUOrder();
+      console.log('[Home] Loaded MRU order:', mruOrder);
 
       // Get slugs for all halls to show (deduplicated to ensure unique React keys)
-      // Put closest hall first if found
       let hallSlugs = Array.from(new Set(sortedHalls.map(h => h.slug)));
-      if (closestSlug && hallSlugs.includes(closestSlug)) {
-        hallSlugs = [closestSlug, ...hallSlugs.filter(slug => slug !== closestSlug)];
-      }
+
+      // Apply MRU ordering: most recently used halls appear first
+      hallSlugs = sortByMRU(hallSlugs, mruOrder);
 
       // Store full DiningHall objects for each hall
       // This enables using getLocationStatus() for consistent open/closed detection
@@ -512,8 +491,18 @@ useFocusEffect(
       setDiningHallsData(hallsDataMap);
 
       setDiningHalls(hallSlugs);
-      setClosestHallSlug(closestSlug);
-      // Don't auto-select a hall - user must explicitly choose
+
+      // Load last selected hall (if exists and is in preferred list)
+      const lastSelected = await getLastSelectedHall();
+      if (lastSelected && hallSlugs.includes(lastSelected)) {
+        console.log('[Home] Restoring last selected hall:', lastSelected);
+        setSelectedHallMode('specific');
+        setSelectedHallSlug(lastSelected);
+        setIsInitialized(true);
+      } else {
+        console.log('[Home] No valid last selected hall, waiting for user selection');
+        // Don't auto-select anything - user must explicitly choose
+      }
     } catch (error) {
       console.error('Error loading dining halls:', error);
       // Fallback to all known halls
@@ -634,61 +623,6 @@ useFocusEffect(
     Alert.alert('Macro Logging', 'Macro logging feature coming soon');
   };
 
-  // State to track if we're finding nearest hall
-  const [isFindingNearest, setIsFindingNearest] = useState(false);
-
-  // Handle "Nearest Open Hall" button tap
-  const handleNearestHall = async () => {
-    // Prevent double-tap while already finding
-    if (isFindingNearest) return;
-
-    haptics.medium();
-    setIsFindingNearest(true);
-
-    try {
-      // Get user location
-      const userLocation = await locationService.getCurrentLocation();
-      if (!userLocation) {
-        Alert.alert('Location Unavailable', 'Please enable location services to find the nearest dining hall.');
-        return;
-      }
-
-      // Map slugs to IDs for preferred halls
-      const slugToId: Record<string, number> = {
-        'bruin-plate': 29, 'de-neve-dining': 28, 'epicuria-at-covel': 31,
-        'spice-kitchen': 30, 'rendezvous': 39, 'the-study-at-hedrick': 37,
-        'the-drey': 38, 'bruin-cafe': 34, 'cafe-1919': 36, 'epicuria-at-ackerman': 41,
-      };
-      const preferredIds = diningHalls
-        .map(slug => slugToId[slug])
-        .filter((id): id is number => id !== undefined);
-
-      // Find nearest open hall using UCLA walking times
-      const result = await mealService.getNearestOpenHall(
-        userLocation.latitude,
-        userLocation.longitude,
-        preferredIds.length > 0 ? preferredIds : undefined
-      );
-
-      if (!result) {
-        Alert.alert('No Open Halls', 'No dining halls are currently open.');
-        return;
-      }
-
-      // Select the nearest hall and trigger recommendation
-      setSelectedHallMode('specific');
-      setSelectedHallSlug(result.hall.slug);
-
-      // Update generation key to force regeneration (use current meal period or fallback)
-      const mealPeriod = selectedMealPeriod || getCurrentMealPeriod();
-      lastGenerationKey.current = `nearest-${result.hall.slug}-${mealPeriod}`;
-    } catch (error) {
-      console.error('[Home] Error finding nearest hall:', error);
-      Alert.alert('Error', 'Could not find nearest dining hall. Please try again.');
-    } finally {
-      setIsFindingNearest(false);
-    }
-  };
 
   return (
     <Screen safeBottom={false}>
@@ -848,16 +782,7 @@ useFocusEffect(
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={[styles.diningHallChips, { paddingLeft: spacing.lg, paddingRight: spacing.lg }]}>
-              {/* Nearest Open Hall button - uses UCLA walking times */}
-              <Chip
-                key="nearest"
-                label={isFindingNearest ? "Finding..." : "Nearest Open"}
-                selected={false}
-                onPress={handleNearestHall}
-                style={isFindingNearest ? { ...styles.diningHallChip, opacity: 0.6 } : styles.diningHallChip}
-                icon={<AppIcon type="location" size={16} color={themeColors.primary} />}
-              />
-              {/* Regular hall chips - closest hall first with location icon */}
+              {/* Dining hall chips - MRU order (most recently selected first) */}
               {diningHalls.map((hallSlug) => {
                 // Map slugs to proper display names
               const hallNameMap: Record<string, string> = {
@@ -903,35 +828,62 @@ useFocusEffect(
                 const chipStyle = statusInfo.status === 'closed'
                   ? { ...styles.diningHallChip, opacity: 0.6 }
                   : styles.diningHallChip;
-                const isClosest = closestHallSlug === hallSlug;
                 return (
                   <Chip
                     key={hallSlug}
                     label={hallName}
                     selected={selectedHallMode === 'specific' && selectedHallSlug === hallSlug}
-                    onPress={() => {
+                    onPress={async () => {
                       haptics.light();
                       setSelectedHallMode('specific');
                       setSelectedHallSlug(hallSlug);
+                      setIsInitialized(true);
+                      // Update MRU order
+                      await selectDiningHall(hallSlug);
                       // Auto-generate will happen via useEffect
                     }}
                     style={chipStyle}
-                    icon={isClosest ? (
-                      <AppIcon type="location" size={16} color={themeColors.primary} />
-                    ) : undefined}
                   />
                 );
               })}
             </ScrollView>
           </View>
         ) : (
-          <ClosedHallCard
-            onSwipeRight={() => {
-              haptics.medium();
-              router.push('/manual-log');
-            }}
-            style={styles.closedCard}
-          />
+          // Empty state: no preferred dining halls
+          <Card variant="elevated" padding="lg" style={styles.emptyStateCard}>
+            <View style={styles.emptyStateContent}>
+              <Text variant="h3" weight="semibold" style={styles.emptyStateTitle}>
+                No Dining Halls Selected
+              </Text>
+              <Text variant="body" color="secondary" style={styles.emptyStateMessage}>
+                Set your preferred dining locations to get personalized meal recommendations.
+              </Text>
+              <Button
+                variant="primary"
+                size="md"
+                onPress={() => {
+                  haptics.medium();
+                  router.push('/profile');
+                }}
+                style={styles.emptyStateButton}>
+                Set Dining Preferences
+              </Button>
+            </View>
+          </Card>
+        )}
+
+        {/* Empty state: no hall selected yet */}
+        {diningHalls.length > 0 && !selectedHallSlug && !recommendedMeal && (
+          <Card variant="elevated" padding="lg" style={styles.emptyStateCard}>
+            <View style={styles.emptyStateContent}>
+              <Text variant="h3" weight="semibold" style={styles.emptyStateTitle}>
+                Select a Dining Hall
+              </Text>
+              <Text variant="body" color="secondary" style={styles.emptyStateMessage}>
+                Choose a dining hall above to get your personalized meal recommendation.
+              </Text>
+            </View>
+          </Card>
         )}
 
         {/* Meal Period Selector - REMOVED: App automatically determines meal period based on time of day */}
@@ -1402,5 +1354,26 @@ const styles = StyleSheet.create({
   },
   modalApplyButton: {
     flex: 1,
+  },
+  // Empty state styles
+  emptyStateCard: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  emptyStateContent: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+  emptyStateTitle: {
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  emptyStateMessage: {
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+    maxWidth: 280,
+  },
+  emptyStateButton: {
+    minWidth: 200,
   },
 });

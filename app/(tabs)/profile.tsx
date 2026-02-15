@@ -59,6 +59,8 @@ export default function ProfileScreen() {
   const [goalWeight, setGoalWeight] = useState('175');
   const [activityLevel, setActivityLevel] = useState('Moderate');
   const [showActivityPicker, setShowActivityPicker] = useState(false);
+  const [dietStrictness, setDietStrictness] = useState<'strict' | 'balanced' | 'relaxed'>('balanced');
+  const [showStrictnessPicker, setShowStrictnessPicker] = useState(false);
   const [goalType, setGoalType] = useState('Lean Muscle Growth');
   const [showGoalTypePicker, setShowGoalTypePicker] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -225,6 +227,7 @@ export default function ProfileScreen() {
             allergen_exclusions?: string[];
             preferred_locations?: number[];
             tracked_micronutrients?: string[];
+            macro_adherence_tier?: 'strict' | 'balanced' | 'relaxed' | null;
             targets?: {
               daily_calories: number;
               daily_protein_g: number;
@@ -276,6 +279,10 @@ export default function ProfileScreen() {
                 'Perform Better': 'Lean Muscle Growth',
               };
               setGoalType(goalBackendToDisplay[profile.goal_type] || profile.goal_type);
+            }
+            // Map backend macro_adherence_tier to diet strictness
+            if (profile.macro_adherence_tier) {
+              setDietStrictness(profile.macro_adherence_tier as 'strict' | 'balanced' | 'relaxed');
             }
             if (profile.dietary_restrictions?.length) {
               setSelectedRestrictions(profile.dietary_restrictions);
@@ -346,6 +353,9 @@ export default function ProfileScreen() {
             'perform': 'Lean Muscle Growth',
           };
           setGoalType(goalMap[data.goal] || 'Lean Muscle Growth');
+        }
+        if (data.dietStrictness) {
+          setDietStrictness(data.dietStrictness);
         }
         if (data.dietaryRequirements?.length) {
           setSelectedRestrictions(data.dietaryRequirements);
@@ -573,6 +583,26 @@ export default function ProfileScreen() {
     saveDislikedFoods();
   }, [dislikedFoods, isInitialLoad]);
 
+  // Save diet strictness when it changes - sync to backend and local storage
+  React.useEffect(() => {
+    if (isInitialLoad) return;
+
+    const saveDietStrictness = async () => {
+      // Save to backend if authenticated
+      if (isAuthenticated) {
+        try {
+          await userService.updateProfile({ macro_adherence_tier: dietStrictness });
+        } catch (error) {
+          console.warn('[profile] Failed to sync diet strictness to backend:', error);
+        }
+      }
+      // Always save to local onboarding data as fallback
+      await saveOnboardingData({ dietStrictness });
+    };
+
+    saveDietStrictness();
+  }, [dietStrictness, isAuthenticated, isInitialLoad]);
+
   const toggleSelection = (
     item: string,
     selected: string[],
@@ -587,6 +617,13 @@ export default function ProfileScreen() {
   };
 
   const activityLevels = ['Sedentary', 'Light', 'Moderate', 'Active', 'Very Active'];
+
+  const strictnessOptions: { id: 'strict' | 'balanced' | 'relaxed'; label: string; description: string }[] = [
+    { id: 'relaxed', label: 'Relaxed', description: 'Prioritize taste while still avoiding overeating' },
+    { id: 'balanced', label: 'Balanced', description: 'Equal balance between enjoying food and eating well' },
+    { id: 'strict', label: 'Strict', description: 'More priority on health, less on taste' },
+  ];
+  const strictnessDisplayMap: Record<string, string> = { strict: 'Strict', balanced: 'Balanced', relaxed: 'Relaxed' };
 
   const calculateMacros = () => {
     // BMR calculation (Mifflin-St Jeor Equation)
@@ -1195,6 +1232,31 @@ export default function ProfileScreen() {
               }}>
               <Text variant="body" weight="semibold">
                 {activityLevel}
+              </Text>
+              <AppIcon type="chevron-up-down" size={16} color={themeColors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Dietary Strictness */}
+          <View style={styles.activitySection}>
+            <Text variant="body" color="secondary" style={styles.activityLabel}>
+              Dietary Strictness
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.activityButton,
+                {
+                  backgroundColor: themeColors.cardBackgroundSecondary,
+                  borderWidth: 1,
+                  borderColor: themeColors.border,
+                },
+              ]}
+              onPress={() => {
+                haptics.medium();
+                setShowStrictnessPicker(true);
+              }}>
+              <Text variant="body" weight="semibold">
+                {strictnessDisplayMap[dietStrictness] || 'Balanced'}
               </Text>
               <AppIcon type="chevron-up-down" size={16} color={themeColors.textSecondary} />
             </TouchableOpacity>
@@ -2002,6 +2064,59 @@ export default function ProfileScreen() {
                     {level}
                   </Text>
                   {activityLevel === level && (
+                    <AppIcon type="check" size={18} color={themeColors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Card>
+        </View>
+      </Modal>
+
+      {/* Dietary Strictness Picker */}
+      <Modal
+        visible={showStrictnessPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowStrictnessPicker(false)}>
+        <View style={styles.modalOverlay}>
+          <Card variant="elevated" padding="lg" style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text variant="h4" weight="semibold" style={styles.modalTitle}>
+                Dietary Strictness
+              </Text>
+              <TouchableOpacity onPress={() => setShowStrictnessPicker(false)}>
+                <AppIcon type="close" size={20} color={themeColors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              style={styles.activityScroll}
+              contentContainerStyle={styles.activityScrollContent}
+              showsVerticalScrollIndicator={true}>
+              {strictnessOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.id}
+                  style={[
+                    styles.activityOption,
+                    dietStrictness === option.id && { backgroundColor: themeColors.primary + '20' },
+                  ]}
+                  onPress={() => {
+                    setDietStrictness(option.id);
+                    setShowStrictnessPicker(false);
+                    haptics.selection();
+                  }}>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      variant="body"
+                      weight={dietStrictness === option.id ? 'semibold' : 'medium'}
+                      style={{ color: dietStrictness === option.id ? themeColors.primary : themeColors.text }}>
+                      {option.label}
+                    </Text>
+                    <Text variant="caption" color="secondary" style={{ marginTop: 2 }}>
+                      {option.description}
+                    </Text>
+                  </View>
+                  {dietStrictness === option.id && (
                     <AppIcon type="check" size={18} color={themeColors.primary} />
                   )}
                 </TouchableOpacity>
