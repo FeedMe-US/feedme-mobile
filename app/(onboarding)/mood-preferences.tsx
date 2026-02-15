@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, LayoutChangeEvent, PanResponder, GestureResponderEvent } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, LayoutChangeEvent, PanResponder } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -31,124 +31,132 @@ function PreferenceSlider({ value, onChange }: PreferenceSliderProps) {
   const themeColors = colors[colorScheme ?? 'light'];
 
   const [sliderWidth, setSliderWidth] = useState(0);
+  // Local step drives the thumb during drag, decoupled from parent state
+  // to prevent the re-render feedback loop that caused jitter.
+  const [localStep, setLocalStep] = useState(value);
   const [isDragging, setIsDragging] = useState(false);
+
   const sliderWidthRef = useRef(0);
   const containerRef = useRef<View>(null);
+  // Absolute X of the container on screen — used to convert pageX to local coords.
+  // We use pageX instead of locationX because locationX is relative to whichever
+  // child view the touch lands on (thumb/dot), not the container, causing wild jumps.
+  const containerLeftRef = useRef(0);
   const lastHapticStepRef = useRef<number>(value);
   const lastHapticTimeRef = useRef<number>(0);
-  const currentValueRef = useRef<number>(value);
+  const localStepRef = useRef<number>(value);
+  const isDraggingRef = useRef(false);
+  // Store onChange in a ref so PanResponder is never recreated mid-gesture.
+  const onChangeRef = useRef(onChange);
 
-  // Track width and value for calculations
-  useEffect(() => {
-    sliderWidthRef.current = sliderWidth;
-  }, [sliderWidth]);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+  useEffect(() => { sliderWidthRef.current = sliderWidth; }, [sliderWidth]);
 
+  // Sync from parent prop when not dragging (handles external value changes)
   useEffect(() => {
-    currentValueRef.current = value;
+    if (!isDraggingRef.current) {
+      setLocalStep(value);
+      localStepRef.current = value;
+    }
   }, [value]);
+
+  const measureContainer = useCallback(() => {
+    containerRef.current?.measureInWindow((x) => {
+      if (x !== undefined) containerLeftRef.current = x;
+    });
+  }, []);
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     const width = event.nativeEvent.layout.width;
     if (width > 0) {
       setSliderWidth(width);
+      measureContainer();
     }
-  }, []);
+  }, [measureContainer]);
 
-  // Calculate step positions (5 steps = 0, 1, 2, 3, 4)
   const stepPositions = useMemo(() => {
     if (sliderWidth === 0) return [];
-    const thumbRadius = 10; // Half of thumb width
+    const thumbRadius = 10;
     const trackStart = thumbRadius;
     const trackEnd = sliderWidth - thumbRadius;
     const trackWidth = trackEnd - trackStart;
     const positions: number[] = [];
     for (let i = 0; i < NUM_STEPS; i++) {
-      const ratio = i / (NUM_STEPS - 1);
-      positions.push(trackStart + ratio * trackWidth);
+      positions.push(trackStart + (i / (NUM_STEPS - 1)) * trackWidth);
     }
     return positions;
   }, [sliderWidth]);
 
-  // Get current thumb position based on value
+  // Show localStep during drag, parent value otherwise
+  const displayStep = isDragging ? localStep : value;
+
   const currentThumbPosition = useMemo(() => {
     if (stepPositions.length === 0) return 0;
-    return stepPositions[value];
-  }, [stepPositions, value]);
+    return stepPositions[displayStep];
+  }, [stepPositions, displayStep]);
 
-  const updateFromTouch = useCallback(
-    (x: number) => {
-      const width = sliderWidthRef.current;
-      if (width === 0) return;
-
-      const thumbRadius = 10;
-      const trackStart = thumbRadius;
-      const trackEnd = width - thumbRadius;
-
-      // Calculate step positions (same as in stepPositions useMemo)
-      const trackWidth = trackEnd - trackStart;
-      const positions: number[] = [];
-      for (let i = 0; i < NUM_STEPS; i++) {
-        const ratio = i / (NUM_STEPS - 1);
-        positions.push(trackStart + ratio * trackWidth);
-      }
-
-      // Allow clicks slightly outside the track for better UX
-      const clampedX = Math.max(0, Math.min(width, x));
-
-      // Find nearest step using calculated positions
-      let nearestStep = 0;
-      let minDistance = Infinity;
-
-      for (let i = 0; i < NUM_STEPS; i++) {
-        const distance = Math.abs(clampedX - positions[i]);
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestStep = i;
-        }
-      }
-
-      // Only update if step changed (use ref to avoid recreating this callback)
-      const currentValue = currentValueRef.current;
-      if (nearestStep !== currentValue) {
-        onChange(nearestStep);
-
-        // Throttle haptics to prevent buzzing - only fire if:
-        // 1. Step is different from last haptic-triggered step
-        // 2. At least 50ms has passed since last haptic
-        const now = Date.now();
-        if (nearestStep !== lastHapticStepRef.current && now - lastHapticTimeRef.current > 50) {
-          lastHapticStepRef.current = nearestStep;
-          lastHapticTimeRef.current = now;
-          haptics.light();
-        }
-      }
-    },
-    [onChange]
-  );
+  // Pure calculation from container-relative X to nearest step.
+  const getNearestStep = useCallback((x: number): number => {
+    const width = sliderWidthRef.current;
+    if (width === 0) return 0;
+    const thumbRadius = 10;
+    const trackStart = thumbRadius;
+    const trackWidth = width - 2 * thumbRadius;
+    const ratio = Math.max(0, Math.min(1, (x - trackStart) / trackWidth));
+    return Math.round(ratio * (NUM_STEPS - 1));
+  }, []);
 
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (evt: GestureResponderEvent) => {
+        onPanResponderGrant: (evt) => {
+          // Re-measure in case scroll position changed since layout
+          measureContainer();
+          isDraggingRef.current = true;
           setIsDragging(true);
-          updateFromTouch(evt.nativeEvent.locationX);
+          const x = evt.nativeEvent.pageX - containerLeftRef.current;
+          const step = getNearestStep(x);
+          localStepRef.current = step;
+          setLocalStep(step);
+          // No haptic on initial touch - only during movement
         },
-        onPanResponderMove: (evt: GestureResponderEvent) => {
-          updateFromTouch(evt.nativeEvent.locationX);
+        onPanResponderMove: (evt) => {
+          const x = evt.nativeEvent.pageX - containerLeftRef.current;
+          const step = getNearestStep(x);
+          if (step !== localStepRef.current) {
+            localStepRef.current = step;
+            setLocalStep(step);
+            // Throttle haptics to prevent spam during boundary oscillation
+            if (step !== lastHapticStepRef.current) {
+              const now = Date.now();
+              if (now - lastHapticTimeRef.current >= 80) {
+                lastHapticStepRef.current = step;
+                lastHapticTimeRef.current = now;
+                haptics.light();
+              } else {
+                // Still update the ref so next step change can fire haptic
+                lastHapticStepRef.current = step;
+              }
+            }
+          }
         },
         onPanResponderRelease: () => {
+          isDraggingRef.current = false;
           setIsDragging(false);
+          onChangeRef.current(localStepRef.current);
         },
         onPanResponderTerminate: () => {
+          isDraggingRef.current = false;
           setIsDragging(false);
+          onChangeRef.current(localStepRef.current);
         },
       }),
-    [updateFromTouch]
+    [getNearestStep, measureContainer]
   );
 
-  const thumbTranslateX = currentThumbPosition - 10; // Center thumb on position
+  const thumbTranslateX = currentThumbPosition - 10;
 
   return (
     <View
@@ -160,31 +168,34 @@ function PreferenceSlider({ value, onChange }: PreferenceSliderProps) {
       onLayout={handleLayout}
       {...panResponder.panHandlers}
     >
-      {/* Track line */}
+      {/* Track line — pointerEvents none so touches pass through to container */}
       <View
+        pointerEvents="none"
         style={[
           styles.track,
           { backgroundColor: themeColors.border },
         ]}
       />
 
-      {/* Visible step dots */}
+      {/* Step dots — pointerEvents none to prevent locationX misreporting */}
       {stepPositions.map((pos, index) => (
         <View
           key={index}
+          pointerEvents="none"
           style={[
             styles.stepDot,
             {
               left: pos - 4,
-              backgroundColor: index === value ? themeColors.primary : themeColors.background,
-              borderColor: index === value ? themeColors.primary : themeColors.border,
+              backgroundColor: index === displayStep ? themeColors.primary : themeColors.background,
+              borderColor: index === displayStep ? themeColors.primary : themeColors.border,
             },
           ]}
         />
       ))}
 
-      {/* Thumb */}
+      {/* Thumb — pointerEvents none so drags always register on the container */}
       <View
+        pointerEvents="none"
         style={[
           styles.thumb,
           {
