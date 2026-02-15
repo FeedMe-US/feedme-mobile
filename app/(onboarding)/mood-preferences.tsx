@@ -236,7 +236,7 @@ export default function MoodPreferencesScreen() {
         texture: preferences.texture,
       },
     });
-    router.push('/(onboarding)/diet-strictness');
+    router.push('/(onboarding)/dietary-requirements');
   };
 
   return (

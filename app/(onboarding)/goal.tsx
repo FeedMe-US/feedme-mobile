@@ -48,7 +48,7 @@ export default function GoalScreen() {
   const handleContinue = async () => {
     if (selectedGoal) {
       await saveOnboardingData({ goal: selectedGoal });
-      router.push('/(onboarding)/sex');
+      router.push('/(onboarding)/mood-preferences');
     }
   };
 

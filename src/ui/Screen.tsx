@@ -5,8 +5,10 @@
 import React from 'react';
 import { View, ViewProps, StyleSheet, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePathname } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors } from '@/src/theme';
+import { OnboardingProgressBar } from './OnboardingProgressBar';
 
 export interface ScreenProps extends ViewProps {
   safe?: boolean;
@@ -26,6 +28,10 @@ export function Screen({
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+
+  // Check if we're in an onboarding screen
+  const isOnboarding = pathname.startsWith('/(onboarding)') && !pathname.includes('/complete');
 
   const screenStyles: ViewStyle[] = [
     styles.base,
@@ -40,6 +46,7 @@ export function Screen({
 
   return (
     <View style={screenStyles} {...props}>
+      {isOnboarding && <OnboardingProgressBar />}
       {children}
     </View>
   );

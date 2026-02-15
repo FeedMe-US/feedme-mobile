@@ -9,4 +9,6 @@ export * from './Screen';
 export * from './Divider';
 export * from './Toggle';
 export * from './SegmentedControl';
+export * from './ProgressBar';
+export * from './OnboardingProgressBar';
 

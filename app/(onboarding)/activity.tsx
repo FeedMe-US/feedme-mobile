@@ -49,7 +49,7 @@ export default function ActivityScreen() {
   const handleContinue = async () => {
     if (selectedActivity) {
       await saveOnboardingData({ activityLevel: selectedActivity });
-      router.push('/(onboarding)/dining-locations');
+      router.push('/(onboarding)/diet-strictness');
     }
   };
 

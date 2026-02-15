@@ -42,7 +42,7 @@ export default function IngredientsAvoidScreen() {
   const handleContinue = async () => {
     const allSelected = Array.from(selectedIngredients);
     await saveOnboardingData({ ingredientsAvoid: allSelected });
-    router.push('/(onboarding)/mood-preferences');
+    router.push('/(onboarding)/dining-locations');
   };
 
   const hasSelections = selectedIngredients.size > 0;
