@@ -78,6 +78,7 @@ export function DiningHallDetailSheet({
 
   // Plate building state
   const [plate, setPlate] = useState<PlateItem[]>([]);
+  const [loggedSuccess, setLoggedSuccess] = useState(false);
 
   // Cache the full menu response to avoid re-fetching when switching periods/stations
   const fullMenuRef = useRef<MenuResponse | null>(null);
@@ -269,9 +270,10 @@ export function DiningHallDetailSheet({
       });
     });
 
-    // Clear plate and close
+    // Clear plate and show confirmation (keep sheet open)
     setPlate([]);
-    onClose();
+    setLoggedSuccess(true);
+    setTimeout(() => setLoggedSuccess(false), 2000);
   };
 
   // Clear entire plate
@@ -505,11 +507,12 @@ export function DiningHallDetailSheet({
                       ))}
                     </ScrollView>
                     <TouchableOpacity
-                      style={[styles.logPlateButton, { backgroundColor: themeColors.success }]}
+                      style={[styles.logPlateButton, { backgroundColor: loggedSuccess ? themeColors.primary : themeColors.success }]}
                       onPress={handleLogPlate}
+                      disabled={loggedSuccess}
                     >
                       <Text variant="body" weight="semibold" style={{ color: themeColors.textInverse }}>
-                        Log This Plate
+                        {loggedSuccess ? '✓ Logged!' : 'Log This Plate'}
                       </Text>
                     </TouchableOpacity>
                   </View>
