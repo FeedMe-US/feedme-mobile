@@ -6,7 +6,7 @@
  * view running totals at top, then log entire plate at once.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Modal,
@@ -14,7 +14,6 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   ScrollView,
-  Dimensions,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -22,7 +21,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors, spacing, radius } from '@/src/theme';
 import { Text } from '@/src/ui/Text';
 import { Chip } from '@/src/components/Chip';
-import { DiningHall, MenuItem, MenuSection, mealService } from '@/src/services/mealService';
+import { DiningHall, MenuItem, MenuSection, MenuResponse, mealService } from '@/src/services/mealService';
 import { MenuItemDetailModal } from './MenuItemDetailModal';
 import { useDailyTracking } from '@/src/store/DailyTrackingContext';
 import { haptics } from '@/src/utils/haptics';
@@ -37,8 +36,6 @@ import {
   getLocationStatus,
 } from '@/src/utils/mealPeriodUtils';
 import { getPacificDateString } from '@/src/utils/dateUtils';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Plate item with quantity tracking
 export interface PlateItem {
@@ -82,6 +79,9 @@ export function DiningHallDetailSheet({
   // Plate building state
   const [plate, setPlate] = useState<PlateItem[]>([]);
 
+  // Cache the full menu response to avoid re-fetching when switching periods/stations
+  const fullMenuRef = useRef<MenuResponse | null>(null);
+
   // Calculate plate totals
   const plateTotals = useMemo(() => {
     return plate.reduce(
@@ -96,6 +96,22 @@ export function DiningHallDetailSheet({
     );
   }, [plate]);
 
+  // Extract sections from cached menu for a given period and station
+  const getSectionsFromMenu = (menu: MenuResponse, period: string, station: RendezvousStation): MenuSection[] => {
+    const mealMenu = menu.meals[period];
+    if (!mealMenu) return [];
+    let sections = mealMenu.sections;
+    if (isStationBasedLocation(hall!)) {
+      sections = sections.map(section => ({
+        ...section,
+        items: section.items.filter(item =>
+          item.station === station || item.station === null || item.station === undefined
+        ),
+      })).filter(section => section.items.length > 0);
+    }
+    return sections;
+  };
+
   // Reset state and load menu when hall changes or sheet opens
   useEffect(() => {
     if (visible && hall) {
@@ -105,6 +121,7 @@ export function DiningHallDetailSheet({
       setPlate([]); // Clear plate when opening new hall
       setMenuPeriodsWithData([]);
       setPeriodsHaveIdenticalContent(false);
+      fullMenuRef.current = null;
 
       // Pre-fetch menu to determine which periods actually have data
       const loadMenuAndDeterminePeriods = async () => {
@@ -114,6 +131,9 @@ export function DiningHallDetailSheet({
           const menu = await mealService.getMenu(hall.id, today);
 
           if (menu && menu.meals) {
+            // Cache the full menu — used for instant period/station switching
+            fullMenuRef.current = menu;
+
             // Get periods that actually have menu items
             const periodsWithItems = (Object.keys(menu.meals) as MealPeriod[]).filter(
               period => {
@@ -146,21 +166,9 @@ export function DiningHallDetailSheet({
 
             setSelectedPeriod(defaultPeriod);
 
-            // Load sections for the default period
-            if (defaultPeriod && menu.meals[defaultPeriod]) {
-              let menuSections = menu.meals[defaultPeriod].sections;
-
-              // Filter by station for Rendezvous (ID 39)
-              if (isStationBasedLocation(hall)) {
-                menuSections = menuSections.map(section => ({
-                  ...section,
-                  items: section.items.filter(item =>
-                    item.station === 'east' || item.station === null || item.station === undefined
-                  ),
-                })).filter(section => section.items.length > 0);
-              }
-
-              setSections(menuSections);
+            // Set sections directly from the cached menu — no second fetch needed
+            if (defaultPeriod) {
+              setSections(getSectionsFromMenu(menu, defaultPeriod, 'east'));
             }
           } else {
             setMenuPeriodsWithData([]);
@@ -179,61 +187,20 @@ export function DiningHallDetailSheet({
     }
   }, [visible, hall]);
 
-  // Fetch menu when period or station changes (after initial load)
-  useEffect(() => {
-    // Skip if this is the initial load (handled above) or if no period selected
-    if (!visible || !hall || !selectedPeriod || menuPeriodsWithData.length === 0) {
-      return;
-    }
-    loadMenu();
-  }, [selectedPeriod, selectedStation]);
-
-  const loadMenu = async () => {
-    if (!hall || !selectedPeriod) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const today = getTodayDate();
-      const menu = await mealService.getMenu(hall.id, today);
-
-      if (menu && menu.meals[selectedPeriod]) {
-        let menuSections = menu.meals[selectedPeriod].sections;
-
-        // Filter by station for Rendezvous (ID 39)
-        if (isStationBasedLocation(hall)) {
-          menuSections = menuSections.map(section => ({
-            ...section,
-            items: section.items.filter(item =>
-              // Include items that match the selected station OR have no station (shared items)
-              item.station === selectedStation || item.station === null || item.station === undefined
-            ),
-          })).filter(section => section.items.length > 0); // Remove empty sections
-        }
-
-        setSections(menuSections);
-      } else {
-        setSections([]);
-        setError('No menu available for this meal period');
-      }
-    } catch (err) {
-      console.error('Failed to load menu:', err);
-      setSections([]);
-      setError('Failed to load menu');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handlePeriodChange = (period: MealPeriod) => {
     haptics.selection();
     setSelectedPeriod(period);
+    if (fullMenuRef.current) {
+      setSections(getSectionsFromMenu(fullMenuRef.current, period, selectedStation));
+    }
   };
 
   const handleStationChange = (station: RendezvousStation) => {
     haptics.selection();
     setSelectedStation(station);
+    if (fullMenuRef.current && selectedPeriod) {
+      setSections(getSectionsFromMenu(fullMenuRef.current, selectedPeriod, station));
+    }
   };
 
   const handleItemPress = (item: MenuItem) => {
@@ -660,9 +627,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   container: {
-    height: SCREEN_HEIGHT * 0.75,
+    height: '75%',
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
+    overflow: 'hidden',
   },
   header: {
     alignItems: 'center',
