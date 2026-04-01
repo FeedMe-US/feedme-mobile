@@ -9,6 +9,11 @@ import { apiClient } from '@/src/services/api';
 import { setOnboardingComplete } from '@/src/lib/onboarding';
 import { getOnboardingData, onboardingDataToProfile, clearOnboardingData } from '@/src/lib/onboardingData';
 import { IS_DEV_MODE } from '@/src/config/devMode';
+import { IS_DEV } from '@/src/config/environment';
+import { supabase } from '@/src/lib/supabase';
+
+const DEV_EMAIL = 'dev@test.ucla.edu';
+const DEV_PASSWORD = 'testpass123';
 
 // Types
 export type AuthStatus = 'idle' | 'loading' | 'authenticated' | 'unauthenticated';
@@ -56,9 +61,25 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     // Prevent multiple initializations
     if (state._initialized) return;
 
-    // In dev mode, bypass real auth and treat user as authenticated
-    if (IS_DEV_MODE) {
-      console.log('[AuthStore] DEV MODE enabled - skipping auth initialization');
+    // In dev environment, auto-sign in to get a real JWT so apiClient has a token
+    if (IS_DEV_MODE || IS_DEV) {
+      console.log('[AuthStore] Dev environment - auto-signing in with test credentials');
+      if (supabase) {
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: DEV_EMAIL,
+            password: DEV_PASSWORD,
+          });
+          if (!error && data.session) {
+            await apiClient.setAuthToken(data.session.access_token);
+            console.log('[AuthStore] Dev auto-login successful');
+          } else {
+            console.warn('[AuthStore] Dev auto-login failed:', error?.message);
+          }
+        } catch (e) {
+          console.warn('[AuthStore] Dev auto-login error:', e);
+        }
+      }
       set({
         status: 'authenticated',
         user: null,
