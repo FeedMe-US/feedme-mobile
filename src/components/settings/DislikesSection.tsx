@@ -54,7 +54,7 @@ export function DislikesSection({
             Disliked Foods
           </Text>
           <Text variant="caption" color="secondary">
-            Foods you'd rather skip (we'll deprioritize these)
+            Foods you&apos;d rather skip (we&apos;ll deprioritize these)
           </Text>
         </View>
       </View>
@@ -142,7 +142,7 @@ export function DislikesSection({
 
       {dislikedFoods.length === 0 && !showInput && (
         <Text variant="caption" color="secondary" style={styles.emptyText}>
-          No disliked foods. Tap above to add foods you'd prefer to avoid.
+          No disliked foods. Tap above to add foods you&apos;d prefer to avoid.
         </Text>
       )}
     </View>

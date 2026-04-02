@@ -16,8 +16,8 @@ import { Screen } from '@/src/ui/Screen';
 import { Text } from '@/src/ui/Text';
 import { Button } from '@/src/ui/Button';
 import { haptics } from '@/src/utils/haptics';
-import { formatCalories, formatMacro } from '@/src/utils/formatNutrition';
-import { getLocationStatus } from '@/src/utils/mealPeriodUtils';
+import { formatMacro } from '@/src/utils/formatNutrition';
+import { getCurrentOrNextMealPeriod } from '@/src/utils/mealPeriodUtils';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
@@ -54,8 +54,6 @@ export default function HomeScreen() {
   const [greeting, setGreeting] = useState('Good Evening');
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollPositionRef = useRef<number>(0);
-  const hasLoadedOnce = useRef(false);
-  const [selectedVitamins, setSelectedVitamins] = useState<string[]>([]);
 
   // Modal state for craving selection
   const [showCravingModal, setShowCravingModal] = useState(false);
@@ -77,66 +75,27 @@ export default function HomeScreen() {
     return 'late_night';
   }, []);
 
-  // Get available periods for the current selection
-  const getAvailablePeriods = useCallback((): MealPeriod[] => {
-    if (selectedHallMode === 'hill' || selectedHallMode === 'campus') {
-      // For "Any Hill" or "Any Campus", show all periods
-      return ['breakfast', 'lunch', 'dinner', 'late_night'];
-    }
-    if (selectedHallSlug) {
-      const hallData = diningHallsData.get(selectedHallSlug);
-      if (hallData?.available_periods && hallData.available_periods.length > 0) {
-        return hallData.available_periods as MealPeriod[];
-      }
-    }
-    // Default to all periods
-    return ['breakfast', 'lunch', 'dinner', 'late_night'];
-  }, [selectedHallMode, selectedHallSlug, diningHallsData]);
-
   // Handle generate recommendation
   const handleGenerate = useCallback(async (includeMood: boolean = true, excludedRecipeIds?: string[]) => {
     if (!selectedMealPeriod) return;
     if (selectedHallMode === 'specific' && !selectedHallSlug) return;
 
-    // Check if the selected hall is closed (for specific mode)
-    // Use getLocationStatus() for consistent behavior with menu screen
+    // For a specific hall, use the hall's current or next meal period rather than
+    // the device-clock period. This handles "between periods" correctly: if it's
+    // 3:45 PM (frontend says "lunch") but dinner opens at 5 PM, we recommend for
+    // "dinner" — not "lunch" — because the hall only has dinner items today.
+    // A null effectiveMealPeriod means the hall has no meal service today → closed.
+    let effectiveMealPeriod = selectedMealPeriod;
     if (selectedHallMode === 'specific' && selectedHallSlug) {
       const hallData = diningHallsData.get(selectedHallSlug);
-      const statusInfo = hallData ? getLocationStatus(hallData) : { status: 'closed' };
+      const hallMealPeriod = hallData ? getCurrentOrNextMealPeriod(hallData) : null;
 
-      if (statusInfo.status === 'closed') {
-        // Hall is closed - show closed message immediately
-        const hallNameMap: Record<string, string> = {
-          'bruin-plate': 'BPlate',
-          'b-plate': 'BPlate',
-          'de-neve-dining': 'De Neve Dining',
-          'de-neve': 'De Neve Dining',
-          'epicuria-at-covel': 'Epicuria at Covel',
-          'epicuria': 'Epicuria at Covel',
-          'spice-kitchen': 'Feast',
-          'feast': 'Feast',
-          'rendezvous': 'Rendezvous',
-          'the-study-at-hedrick': 'The Study',
-          'the-study': 'The Study',
-          'the-drey': 'The Drey',
-          'bruin-cafe': 'BCafe',
-          'cafe-1919': 'Cafe 1919',
-          'epicuria-at-ackerman': 'Epicuria at Ackerman',
-          'anderson-cafe': 'Anderson Café',
-          'bombshelter': 'Court of Sciences: Bombshelter',
-          'luvalle-fusion': 'LuValle: Fusion',
-          'luvalle-pizza': 'LuValle: All Rise Pizza',
-          'luvalle-epazote': 'LuValle: Epazote',
-          'luvalle-burger': 'LuValle: Burger Assemble',
-          'luvalle-poke': 'LuValle: Northern Lights Poke',
-          'luvalle-panini': 'LuValle: Northern Lights Panini',
-          'synapse': 'Synapse',
-        };
-        const hallName = hallNameMap[selectedHallSlug] || selectedHallSlug
+      if (!hallMealPeriod) {
+        // Hall has no meal period today (e.g. Sunday closure, or past midnight)
+        const hallName = hallData?.name || selectedHallSlug
           .split('-')
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
           .join(' ');
-        
         setRecommendedMeal({
           diningHall: hallName,
           mealItems: [],
@@ -149,13 +108,14 @@ export default function HomeScreen() {
         haptics.light();
         return;
       }
+      effectiveMealPeriod = hallMealPeriod;
     }
 
     setIsGenerating(true);
     try {
       const result = await mealService.getRecommendedMealWithOptions(
         selectedHallSlug,
-        selectedMealPeriod,
+        effectiveMealPeriod,
         {
           mood: includeMood ? (moodText || undefined) : undefined,
           mode: selectedHallMode,
@@ -185,57 +145,6 @@ export default function HomeScreen() {
   }, []);
 
   // Load selected vitamins from profile/onboarding
-  useEffect(() => {
-    const loadSelectedVitamins = async () => {
-      try {
-        // Mapping between display names and backend keys
-        const vitaminDisplayToKey: Record<string, string> = {
-          'Vitamin D': 'vitamin_d_mcg',
-          'Vitamin B12': 'vitamin_b12_mcg',
-          'Vitamin C': 'vitamin_c_mg',
-          'Iron': 'iron_mg',
-          'Calcium': 'calcium_mg',
-          'Potassium': 'potassium_mg',
-          'Vitamin A': 'vitamin_a_mcg',
-          'Vitamin B6': 'vitamin_b6_mg',
-        };
-
-        // Try to get from backend first if authenticated
-        let vitaminDisplayNames: string[] = [];
-        try {
-          const profile = await userService.getProfile();
-          if (profile?.tracked_micronutrients?.length) {
-            // Map backend keys to display names
-            const keyToDisplay: Record<string, string> = Object.fromEntries(
-              Object.entries(vitaminDisplayToKey).map(([k, v]) => [v, k])
-            );
-            vitaminDisplayNames = profile.tracked_micronutrients
-              .map(key => keyToDisplay[key])
-              .filter(name => name !== undefined);
-          }
-        } catch (error) {
-          console.warn('[Home] Error loading vitamins from backend:', error);
-        }
-
-        // Fall back to local onboarding data if no backend data
-        if (vitaminDisplayNames.length === 0) {
-          const onboardingData = await getOnboardingData();
-          vitaminDisplayNames = onboardingData.selectedVitamins || [];
-        }
-
-        // Convert display names to backend keys for filtering
-        const vitaminKeys = vitaminDisplayNames
-          .map(name => vitaminDisplayToKey[name])
-          .filter(key => key !== undefined);
-        
-        setSelectedVitamins(vitaminKeys);
-      } catch (error) {
-        console.warn('[Home] Error loading selected vitamins:', error);
-      }
-    };
-    loadSelectedVitamins();
-  }, []);
-
   // Refresh daily tracking (including micronutrients) when screen gains focus
   useFocusEffect(
     useCallback(() => {
@@ -355,16 +264,6 @@ useFocusEffect(
             38: 'the-drey',
             39: 'rendezvous',
             41: 'epicuria-at-ackerman',
-            // ASUCLA / LuValle / satellite locations
-            100: 'anderson-cafe',
-            101: 'bombshelter',
-            102: 'luvalle-fusion',
-            103: 'luvalle-pizza',
-            104: 'luvalle-epazote',
-            105: 'luvalle-burger',
-            106: 'luvalle-poke',
-            107: 'luvalle-panini',
-            108: 'synapse',
           };
           preferredSlugs = profile.preferred_locations
             .map(id => locationIdToSlug[id])
@@ -409,16 +308,6 @@ useFocusEffect(
         { id: 34, name: 'BCafe', slug: 'bruin-cafe', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
         { id: 36, name: 'Cafe 1919', slug: 'cafe-1919', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
         { id: 41, name: 'Epicuria at Ackerman', slug: 'epicuria-at-ackerman', type: 'boutique', is_residential: false, campus_area: 'Central', is_open_now: false },
-        // ASUCLA / LuValle / satellite locations
-        { id: 100, name: 'Anderson Café', slug: 'anderson-cafe', type: 'boutique', is_residential: false, campus_area: 'North Campus', is_open_now: false },
-        { id: 101, name: 'Court of Sciences: Bombshelter', slug: 'bombshelter', type: 'boutique', is_residential: false, campus_area: 'South Campus', is_open_now: false },
-        { id: 102, name: 'LuValle: Fusion', slug: 'luvalle-fusion', type: 'boutique', is_residential: false, campus_area: 'Central Campus', is_open_now: false },
-        { id: 103, name: 'LuValle: All Rise Pizza', slug: 'luvalle-pizza', type: 'boutique', is_residential: false, campus_area: 'Central Campus', is_open_now: false },
-        { id: 104, name: 'LuValle: Epazote', slug: 'luvalle-epazote', type: 'boutique', is_residential: false, campus_area: 'Central Campus', is_open_now: false },
-        { id: 105, name: 'LuValle: Burger Assemble', slug: 'luvalle-burger', type: 'boutique', is_residential: false, campus_area: 'Central Campus', is_open_now: false },
-        { id: 106, name: 'LuValle: Northern Lights Poke', slug: 'luvalle-poke', type: 'boutique', is_residential: false, campus_area: 'Central Campus', is_open_now: false },
-        { id: 107, name: 'LuValle: Northern Lights Panini', slug: 'luvalle-panini', type: 'boutique', is_residential: false, campus_area: 'Central Campus', is_open_now: false },
-        { id: 108, name: 'Synapse', slug: 'synapse', type: 'boutique', is_residential: false, campus_area: 'South Campus', is_open_now: false },
       ];
 
       // Merge API data with fallback data (API data takes precedence for open status)
@@ -451,28 +340,27 @@ useFocusEffect(
         }
       });
 
-      // Only show preferred halls (no other open halls)
-      // Sort: open preferred first, then closed preferred
-      const sortedHalls = [
-        ...preferredHalls.filter(h => h.is_open_now),
-        ...preferredHalls.filter(h => !h.is_open_now),
-      ].sort((a, b) => {
-        // Within each group, sort alphabetically
-        return a.name.localeCompare(b.name);
-      });
-
       // Get MRU order from storage
       const mruOrder = await getMRUOrder();
       console.log('[Home] Loaded MRU order:', mruOrder);
 
-      // Get slugs for all halls to show (deduplicated to ensure unique React keys)
-      let hallSlugs = Array.from(new Set(sortedHalls.map(h => h.slug)));
+      // Sort chips: halls with a meal today (open or opening later) come first,
+      // halls with no meal service today come last. Within each group, apply MRU
+      // order so the most recently tapped hall stays at the front.
+      // current_meal is set by the API whenever a hall has an active or upcoming
+      // meal period today (falls back from current → next meal), so it's the right
+      // signal here rather than is_open_now (which is false between periods).
+      const hallsWithMeal = preferredHalls.filter(h => !!h.current_meal || !!h.next_meal);
+      const hallsWithoutMeal = preferredHalls.filter(h => !h.current_meal && !h.next_meal);
+      const openSlugs = sortByMRU(
+        Array.from(new Set(hallsWithMeal.map(h => h.slug))), mruOrder
+      );
+      const closedSlugs = sortByMRU(
+        Array.from(new Set(hallsWithoutMeal.map(h => h.slug))), mruOrder
+      );
+      let hallSlugs = [...openSlugs, ...closedSlugs];
 
-      // Apply MRU ordering: most recently used halls appear first
-      hallSlugs = sortByMRU(hallSlugs, mruOrder);
-
-      // Store full DiningHall objects for each hall
-      // This enables using getLocationStatus() for consistent open/closed detection
+      // Store full DiningHall objects keyed by slug for fast lookup
       const hallsDataMap = new Map<string, DiningHall>();
 
       // First, populate from mergedHalls (has API data with is_open_now, next_meal_time, etc.)
@@ -803,16 +691,6 @@ useFocusEffect(
                 'bruin-cafe': 'BCafe',
                 'cafe-1919': 'Cafe 1919',
                 'epicuria-at-ackerman': 'Epicuria at Ackerman',
-                // ASUCLA / LuValle / satellite locations
-                'anderson-cafe': 'Anderson Café',
-                'bombshelter': 'Court of Sciences: Bombshelter',
-                'luvalle-fusion': 'LuValle: Fusion',
-                'luvalle-pizza': 'LuValle: All Rise Pizza',
-                'luvalle-epazote': 'LuValle: Epazote',
-                'luvalle-burger': 'LuValle: Burger Assemble',
-                'luvalle-poke': 'LuValle: Northern Lights Poke',
-                'luvalle-panini': 'LuValle: Northern Lights Panini',
-                'synapse': 'Synapse',
               };
                 // Clean up hall name - remove any "Closed" suffix that might be in the name
                 let hallName = hallNameMap[hallSlug] || hallSlug
@@ -821,13 +699,15 @@ useFocusEffect(
                   .join(' ');
                 // Remove "Closed" suffix if present
                 hallName = hallName.replace(/\s*\(?Closed\)?/gi, '').trim();
-                // Get open status using getLocationStatus() for consistency with menu screen
-                // This properly handles "Open", "Opening Soon", and "Closed" states
+                // Dim the chip only when the hall has no meal service today at all
+                // (current_meal is null). If current_meal is set — even for an
+                // upcoming period — the chip is fully visible so users know they
+                // can tap it for a recommendation.
                 const hallData = diningHallsData.get(hallSlug);
-                const statusInfo = hallData ? getLocationStatus(hallData) : { status: 'closed' };
-                const chipStyle = statusInfo.status === 'closed'
-                  ? { ...styles.diningHallChip, opacity: 0.6 }
-                  : styles.diningHallChip;
+                const hasMealToday = !!hallData?.current_meal || !!hallData?.next_meal;
+                const chipStyle = hasMealToday
+                  ? styles.diningHallChip
+                  : { ...styles.diningHallChip, opacity: 0.6 };
                 return (
                   <Chip
                     key={hallSlug}
