@@ -154,61 +154,7 @@ export default function ProfileScreen() {
   // Load profile data - prefer backend if authenticated, fall back to local
   React.useEffect(() => {
     const loadProfileData = async () => {
-      // Map location IDs to display names (must match database IDs!)
-      const locationIdToName: Record<number, string> = {
-        // Residential dining
-        28: 'De Neve Dining',
-        29: 'BPlate',
-        30: 'Feast',
-        31: 'Epicuria at Covel',
-        // Hill / campus restaurants
-        34: 'BCafe',
-        36: 'Cafe 1919',
-        37: 'The Study',
-        38: 'The Drey',
-        39: 'Rendezvous',
-        41: 'Epicuria at Ackerman',
-        // ASUCLA / LuValle / satellite locations
-        100: 'Anderson Café',
-        101: 'Court of Sciences: Bombshelter',
-        102: 'LuValle: Fusion',
-        103: 'LuValle: All Rise Pizza',
-        104: 'LuValle: Epazote',
-        105: 'LuValle: Burger Assemble',
-        106: 'LuValle: Northern Lights Poke',
-        107: 'LuValle: Northern Lights Panini',
-        108: 'Synapse',
-      };
-
-      // Map location slugs to display names (for local data)
-      const locationSlugToName: Record<string, string> = {
-        // Legacy slugs from onboarding/local storage
-        'de-neve': 'De Neve',
-        'de-neve-dining': 'De Neve Dining',
-        'b-plate': 'BPlate',
-        'bruin-plate': 'BPlate',
-        'epicuria': 'Epicuria',
-        'epicuria-at-covel': 'Epicuria at Covel',
-        'rendezvous': 'Rendezvous',
-        'the-study': 'The Study',
-        'the-study-at-hedrick': 'The Study',
-        'feast': 'Feast',
-        'spice-kitchen': 'Feast',
-        'the-drey': 'The Drey',
-        'bruin-cafe': 'BCafe',
-        'cafe-1919': 'Cafe 1919',
-        'epicuria-at-ackerman': 'Epicuria at Ackerman',
-        // ASUCLA / LuValle locations
-        'anderson-cafe': 'Anderson Café',
-        'bombshelter': 'Court of Sciences: Bombshelter',
-        'luvalle-fusion': 'LuValle: Fusion',
-        'luvalle-pizza': 'LuValle: All Rise Pizza',
-        'luvalle-epazote': 'LuValle: Epazote',
-        'luvalle-burger': 'LuValle: Burger Assemble',
-        'luvalle-poke': 'LuValle: Northern Lights Poke',
-        'luvalle-panini': 'LuValle: Northern Lights Panini',
-        'synapse': 'Synapse',
-      };
+      const { ID_TO_NAME: locationIdToName, SLUG_TO_NAME: locationSlugToName } = require('@/src/constants/diningLocations');
 
       try {
         // If authenticated, try to fetch from backend first
@@ -871,10 +817,11 @@ export default function ProfileScreen() {
         setGoalWeight(editValue);
         if (!isNaN(numericValue)) {
           saveOnboardingData({ goalWeight: Math.round(numericValue) });
-          // Sync to backend
-          try {
-            await userService.updateProfile({ goal_weight_lbs: numericValue });
-          } catch { /* best-effort sync */ }
+          if (isAuthenticated) {
+            try {
+              await userService.updateProfile({ goal_weight_lbs: Math.round(numericValue) });
+            } catch { /* best-effort sync */ }
+          }
         }
         break;
     }

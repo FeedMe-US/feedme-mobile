@@ -673,25 +673,7 @@ useFocusEffect(
               {/* Dining hall chips - MRU order (most recently selected first) */}
               {diningHalls.map((hallSlug) => {
                 // Map slugs to proper display names
-              const hallNameMap: Record<string, string> = {
-                // Residential dining
-                'bruin-plate': 'BPlate',
-                'b-plate': 'BPlate',
-                'de-neve-dining': 'De Neve Dining',
-                'de-neve': 'De Neve Dining',
-                'epicuria-at-covel': 'Epicuria at Covel',
-                'epicuria': 'Epicuria at Covel',
-                'spice-kitchen': 'Feast',
-                'feast': 'Feast',
-                // Hill / campus restaurants
-                'rendezvous': 'Rendezvous',
-                'the-study-at-hedrick': 'The Study',
-                'the-study': 'The Study',
-                'the-drey': 'The Drey',
-                'bruin-cafe': 'BCafe',
-                'cafe-1919': 'Cafe 1919',
-                'epicuria-at-ackerman': 'Epicuria at Ackerman',
-              };
+              const { SLUG_TO_NAME: hallNameMap } = require('@/src/constants/diningLocations');
                 // Clean up hall name - remove any "Closed" suffix that might be in the name
                 let hallName = hallNameMap[hallSlug] || hallSlug
                   .split('-')

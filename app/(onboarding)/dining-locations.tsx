@@ -8,43 +8,15 @@ import { Button } from '@/src/ui/Button';
 import { Screen } from '@/src/ui/Screen';
 import { MaterialIcons } from '@expo/vector-icons';
 import { saveOnboardingData } from '@/src/lib/onboardingData';
-
-type DiningLocation =
-  // Residential dining
-  | 'de-neve-dining'
-  | 'b-plate'
-  | 'epicuria-at-covel'
-  | 'spice-kitchen'
-  // Hill / campus restaurants
-  | 'rendezvous'
-  | 'the-study-at-hedrick'
-  | 'the-drey'
-  | 'bruin-cafe'
-  | 'cafe-1919'
-  | 'epicuria-at-ackerman';
-
-const diningLocations: { id: DiningLocation; name: string }[] = [
-  // Residential dining
-  { id: 'de-neve-dining', name: 'De Neve Dining' },
-  { id: 'b-plate', name: 'Bruin Plate' },
-  { id: 'epicuria-at-covel', name: 'Epicuria at Covel' },
-  { id: 'spice-kitchen', name: 'Feast at Rieber (Spice Kitchen)' },
-  // Hill / campus restaurants
-  { id: 'bruin-cafe', name: 'Bruin Cafe' },
-  { id: 'cafe-1919', name: 'Cafe 1919' },
-  { id: 'rendezvous', name: 'Rendezvous' },
-  { id: 'the-study-at-hedrick', name: 'The Study at Hedrick' },
-  { id: 'the-drey', name: 'The Drey' },
-  { id: 'epicuria-at-ackerman', name: 'Epicuria at Ackerman' },
-];
+import { DINING_LOCATIONS, type DiningLocationSlug } from '@/src/constants/diningLocations';
 
 export default function DiningLocationsScreen() {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light'];
   const router = useRouter();
-  const [selectedLocations, setSelectedLocations] = useState<Set<DiningLocation>>(new Set());
+  const [selectedLocations, setSelectedLocations] = useState<Set<DiningLocationSlug>>(new Set());
 
-  const handleToggleLocation = (locationId: DiningLocation) => {
+  const handleToggleLocation = (locationId: DiningLocationSlug) => {
     const newSelection = new Set(selectedLocations);
     if (newSelection.has(locationId)) {
       newSelection.delete(locationId);
@@ -88,11 +60,11 @@ export default function DiningLocationsScreen() {
 
           {/* Dining Location Options */}
           <View style={styles.optionsContainer}>
-            {diningLocations.map((location) => {
-              const isSelected = selectedLocations.has(location.id);
+            {DINING_LOCATIONS.map((location) => {
+              const isSelected = selectedLocations.has(location.slug);
               return (
                 <TouchableOpacity
-                  key={location.id}
+                  key={location.slug}
                   style={[
                     styles.optionChip,
                     {
@@ -105,7 +77,7 @@ export default function DiningLocationsScreen() {
                       borderWidth: 1,
                     },
                   ]}
-                  onPress={() => handleToggleLocation(location.id)}
+                  onPress={() => handleToggleLocation(location.slug)}
                   activeOpacity={0.7}>
                   <Text
                     variant="body"
