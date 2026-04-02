@@ -230,59 +230,6 @@ export default function ManualLogScreen() {
           ))}
         </View>
 
-        {/* Scan Options */}
-        <View style={styles.scanOptionsContainer}>
-          {/* Scan Meal Option */}
-          <TouchableOpacity
-            style={[styles.scanCard, { backgroundColor: themeColors.cardBackground }]}
-            onPress={() => {
-              haptics.medium();
-              router.push({
-                pathname: '/camera',
-                params: { mode: 'photo' },
-              });
-            }}
-            activeOpacity={0.7}>
-            <View style={styles.scanCardContent}>
-              <AppIcon type="camera" size={24} />
-              <View style={styles.scanTextContainer}>
-                <Text variant="bodySmall" weight="semibold">
-                  Scan Meal
-                </Text>
-                <Text variant="caption" color="secondary" style={{ fontSize: 11 }}>
-                  AI-powered meal analysis
-                </Text>
-              </View>
-              <Text style={styles.arrowIcon}>→</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Barcode Scan Option */}
-          <TouchableOpacity
-            style={[styles.scanCard, { backgroundColor: themeColors.cardBackground }]}
-            onPress={() => {
-              haptics.medium();
-              router.push({
-                pathname: '/camera',
-                params: { mode: 'barcode' },
-              });
-            }}
-            activeOpacity={0.7}>
-            <View style={styles.scanCardContent}>
-              <AppIcon type="barcode" size={24} />
-              <View style={styles.scanTextContainer}>
-                <Text variant="bodySmall" weight="semibold">
-                  Scan Barcode
-                </Text>
-                <Text variant="caption" color="secondary" style={{ fontSize: 11 }}>
-                  Scan product barcode to add
-                </Text>
-              </View>
-              <Text style={styles.arrowIcon}>→</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
         {/* Search Input */}
         <View style={styles.searchContainer}>
           <TextInput
@@ -683,30 +630,6 @@ const styles = StyleSheet.create({
   emptyState: {
     padding: spacing.xl,
     alignItems: 'center',
-  },
-  scanOptionsContainer: {
-    marginBottom: spacing.sm,
-  },
-  scanCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-  },
-  scanCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  scanIcon: {
-    fontSize: 24,
-  },
-  scanTextContainer: {
-    flex: 1,
-  },
-  arrowIcon: {
-    fontSize: 18,
-    opacity: 0.5,
   },
   // Modal styles
   modalOverlay: {
