@@ -350,8 +350,8 @@ useFocusEffect(
       // current_meal is set by the API whenever a hall has an active or upcoming
       // meal period today (falls back from current → next meal), so it's the right
       // signal here rather than is_open_now (which is false between periods).
-      const hallsWithMeal = preferredHalls.filter(h => !!h.current_meal);
-      const hallsWithoutMeal = preferredHalls.filter(h => !h.current_meal);
+      const hallsWithMeal = preferredHalls.filter(h => !!h.current_meal || !!h.next_meal);
+      const hallsWithoutMeal = preferredHalls.filter(h => !h.current_meal && !h.next_meal);
       const openSlugs = sortByMRU(
         Array.from(new Set(hallsWithMeal.map(h => h.slug))), mruOrder
       );

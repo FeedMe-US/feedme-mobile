@@ -70,7 +70,7 @@ export function AllergenSection({
             Allergen Exclusions
           </Text>
           <Text variant="caption" color="secondary">
-            Foods we'll never recommend for your safety
+            Foods we&apos;ll never recommend for your safety
           </Text>
         </View>
       </View>
@@ -124,7 +124,7 @@ export function AllergenSection({
 
       {selectedAllergens.length === 0 && (
         <Text variant="caption" color="secondary" style={styles.emptyText}>
-          No allergens selected. Tap "Add Allergen" to add any food allergies.
+          No allergens selected. Tap &quot;Add Allergen&quot; to add any food allergies.
         </Text>
       )}
 
