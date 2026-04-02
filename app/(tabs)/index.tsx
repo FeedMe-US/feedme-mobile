@@ -8,6 +8,7 @@ import { Chip } from '@/src/components/Chip';
 import { MacroRing } from '@/src/components/MacroRing';
 import { MealCard } from '@/src/components/MealCard';
 import { ClosedHallCard } from '@/src/components/ClosedHallCard';
+import { SkeletonCard } from '@/src/components/SkeletonCard';
 import { MealRecommendation, mealService, MealPeriod } from '@/src/services/mealService';
 import { useDailyTracking } from '@/src/store/DailyTrackingContext';
 import { colors, spacing, radius } from '@/src/theme';
@@ -21,7 +22,7 @@ import { getCurrentOrNextMealPeriod } from '@/src/utils/mealPeriodUtils';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, TextInput, ActivityIndicator, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { userService } from '@/src/services/userService';
 import { getOnboardingData } from '@/src/lib/onboardingData';
 import type { DiningHall } from '@/src/services/mealService';
@@ -771,12 +772,7 @@ useFocusEffect(
 
         {/* Recommended Meal Card - show loading state or meal card */}
         {isGenerating && !recommendedMeal ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={themeColors.primary} />
-            <Text variant="body" color="secondary" style={styles.loadingText}>
-              Generating your meal...
-            </Text>
-          </View>
+          <SkeletonCard />
         ) : null}
 
         {/* Recommended Meal Card or Closed Message */}
@@ -1172,16 +1168,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
-  },
-  // Loading state
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xl,
-    marginTop: spacing.lg,
-  },
-  loadingText: {
-    marginTop: spacing.md,
   },
   // Craving button section
   cravingButtonSection: {
