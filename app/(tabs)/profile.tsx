@@ -246,10 +246,12 @@ export default function ProfileScreen() {
               const namePart = profile.email.split('@')[0];
               setUserName(namePart);
             }
-            // Set weight (goal weight comes from local onboarding data, API doesn't have it)
             if (profile.weight_lbs) {
               setWeight(profile.weight_lbs.toString());
-              // Use current weight as fallback for goal weight if not set in onboarding data
+            }
+            if (profile.goal_weight_lbs) {
+              setGoalWeight(profile.goal_weight_lbs.toString());
+            } else if (profile.weight_lbs) {
               setGoalWeight(profile.weight_lbs.toString());
             }
             if (profile.sex) setGender(profile.sex);
@@ -867,9 +869,12 @@ export default function ProfileScreen() {
         break;
       case 'goalWeight':
         setGoalWeight(editValue);
-        // Save to local storage (API doesn't have goal_weight_lbs field yet)
         if (!isNaN(numericValue)) {
           saveOnboardingData({ goalWeight: Math.round(numericValue) });
+          // Sync to backend
+          try {
+            await userService.updateProfile({ goal_weight_lbs: numericValue });
+          } catch { /* best-effort sync */ }
         }
         break;
     }

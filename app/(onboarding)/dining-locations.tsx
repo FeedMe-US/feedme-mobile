@@ -10,55 +10,32 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { saveOnboardingData } from '@/src/lib/onboardingData';
 
 type DiningLocation =
-  // Residential dining (legacy slugs preserved for compatibility)
-  | 'de-neve'
+  // Residential dining
   | 'de-neve-dining'
   | 'b-plate'
-  | 'bruin-plate'
-  | 'epicuria'
   | 'epicuria-at-covel'
-  | 'feast'
   | 'spice-kitchen'
   // Hill / campus restaurants
   | 'rendezvous'
-  | 'the-study'
   | 'the-study-at-hedrick'
   | 'the-drey'
   | 'bruin-cafe'
   | 'cafe-1919'
-  | 'epicuria-at-ackerman'
-  // ASUCLA / LuValle / satellite locations
-  | 'anderson-cafe'
-  | 'luvalle-fusion'
-  | 'luvalle-pizza'
-  | 'luvalle-epazote'
-  | 'luvalle-burger'
-  | 'luvalle-poke'
-  | 'luvalle-panini'
-  | 'synapse';
+  | 'epicuria-at-ackerman';
 
 const diningLocations: { id: DiningLocation; name: string }[] = [
   // Residential dining
   { id: 'de-neve-dining', name: 'De Neve Dining' },
-  { id: 'b-plate', name: 'BPlate' },
+  { id: 'b-plate', name: 'Bruin Plate' },
   { id: 'epicuria-at-covel', name: 'Epicuria at Covel' },
-  { id: 'spice-kitchen', name: 'Feast' },
+  { id: 'spice-kitchen', name: 'Feast at Rieber (Spice Kitchen)' },
   // Hill / campus restaurants
-  { id: 'rendezvous', name: 'Rendezvous' },
-  { id: 'the-study-at-hedrick', name: 'The Study' },
-  { id: 'the-drey', name: 'The Drey' },
-  { id: 'bruin-cafe', name: 'BCafe' },
+  { id: 'bruin-cafe', name: 'Bruin Cafe' },
   { id: 'cafe-1919', name: 'Cafe 1919' },
+  { id: 'rendezvous', name: 'Rendezvous' },
+  { id: 'the-study-at-hedrick', name: 'The Study at Hedrick' },
+  { id: 'the-drey', name: 'The Drey' },
   { id: 'epicuria-at-ackerman', name: 'Epicuria at Ackerman' },
-  // ASUCLA / LuValle / satellite locations
-  { id: 'anderson-cafe', name: 'Anderson Café' },
-  { id: 'luvalle-fusion', name: 'LuValle: Fusion' },
-  { id: 'luvalle-pizza', name: 'LuValle: All Rise Pizza' },
-  { id: 'luvalle-epazote', name: 'LuValle: Epazote' },
-  { id: 'luvalle-burger', name: 'LuValle: Burger Assemble' },
-  { id: 'luvalle-poke', name: 'LuValle: Northern Lights Poke' },
-  { id: 'luvalle-panini', name: 'LuValle: Northern Lights Panini' },
-  { id: 'synapse', name: 'Synapse' },
 ];
 
 export default function DiningLocationsScreen() {
