@@ -16,7 +16,7 @@ import { Screen } from '@/src/ui/Screen';
 import { Text } from '@/src/ui/Text';
 import { Button } from '@/src/ui/Button';
 import { haptics } from '@/src/utils/haptics';
-import { formatCalories, formatMacro } from '@/src/utils/formatNutrition';
+import { formatMacro } from '@/src/utils/formatNutrition';
 import { getCurrentOrNextMealPeriod } from '@/src/utils/mealPeriodUtils';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -54,8 +54,6 @@ export default function HomeScreen() {
   const [greeting, setGreeting] = useState('Good Evening');
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollPositionRef = useRef<number>(0);
-  const hasLoadedOnce = useRef(false);
-  const [selectedVitamins, setSelectedVitamins] = useState<string[]>([]);
 
   // Modal state for craving selection
   const [showCravingModal, setShowCravingModal] = useState(false);
@@ -77,22 +75,6 @@ export default function HomeScreen() {
     return 'late_night';
   }, []);
 
-  // Get available periods for the current selection
-  const getAvailablePeriods = useCallback((): MealPeriod[] => {
-    if (selectedHallMode === 'hill' || selectedHallMode === 'campus') {
-      // For "Any Hill" or "Any Campus", show all periods
-      return ['breakfast', 'lunch', 'dinner', 'late_night'];
-    }
-    if (selectedHallSlug) {
-      const hallData = diningHallsData.get(selectedHallSlug);
-      if (hallData?.available_periods && hallData.available_periods.length > 0) {
-        return hallData.available_periods as MealPeriod[];
-      }
-    }
-    // Default to all periods
-    return ['breakfast', 'lunch', 'dinner', 'late_night'];
-  }, [selectedHallMode, selectedHallSlug, diningHallsData]);
-
   // Handle generate recommendation
   const handleGenerate = useCallback(async (includeMood: boolean = true, excludedRecipeIds?: string[]) => {
     if (!selectedMealPeriod) return;
@@ -110,7 +92,7 @@ export default function HomeScreen() {
 
       if (!hallMealPeriod) {
         // Hall has no meal period today (e.g. Sunday closure, or past midnight)
-        const hallName = selectedHallSlug
+        const hallName = hallData?.name || selectedHallSlug
           .split('-')
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
           .join(' ');
@@ -163,57 +145,6 @@ export default function HomeScreen() {
   }, []);
 
   // Load selected vitamins from profile/onboarding
-  useEffect(() => {
-    const loadSelectedVitamins = async () => {
-      try {
-        // Mapping between display names and backend keys
-        const vitaminDisplayToKey: Record<string, string> = {
-          'Vitamin D': 'vitamin_d_mcg',
-          'Vitamin B12': 'vitamin_b12_mcg',
-          'Vitamin C': 'vitamin_c_mg',
-          'Iron': 'iron_mg',
-          'Calcium': 'calcium_mg',
-          'Potassium': 'potassium_mg',
-          'Vitamin A': 'vitamin_a_mcg',
-          'Vitamin B6': 'vitamin_b6_mg',
-        };
-
-        // Try to get from backend first if authenticated
-        let vitaminDisplayNames: string[] = [];
-        try {
-          const profile = await userService.getProfile();
-          if (profile?.tracked_micronutrients?.length) {
-            // Map backend keys to display names
-            const keyToDisplay: Record<string, string> = Object.fromEntries(
-              Object.entries(vitaminDisplayToKey).map(([k, v]) => [v, k])
-            );
-            vitaminDisplayNames = profile.tracked_micronutrients
-              .map(key => keyToDisplay[key])
-              .filter(name => name !== undefined);
-          }
-        } catch (error) {
-          console.warn('[Home] Error loading vitamins from backend:', error);
-        }
-
-        // Fall back to local onboarding data if no backend data
-        if (vitaminDisplayNames.length === 0) {
-          const onboardingData = await getOnboardingData();
-          vitaminDisplayNames = onboardingData.selectedVitamins || [];
-        }
-
-        // Convert display names to backend keys for filtering
-        const vitaminKeys = vitaminDisplayNames
-          .map(name => vitaminDisplayToKey[name])
-          .filter(key => key !== undefined);
-        
-        setSelectedVitamins(vitaminKeys);
-      } catch (error) {
-        console.warn('[Home] Error loading selected vitamins:', error);
-      }
-    };
-    loadSelectedVitamins();
-  }, []);
-
   // Refresh daily tracking (including micronutrients) when screen gains focus
   useFocusEffect(
     useCallback(() => {
@@ -773,7 +704,7 @@ useFocusEffect(
                 // upcoming period — the chip is fully visible so users know they
                 // can tap it for a recommendation.
                 const hallData = diningHallsData.get(hallSlug);
-                const hasMealToday = !!hallData?.current_meal;
+                const hasMealToday = !!hallData?.current_meal || !!hallData?.next_meal;
                 const chipStyle = hasMealToday
                   ? styles.diningHallChip
                   : { ...styles.diningHallChip, opacity: 0.6 };
