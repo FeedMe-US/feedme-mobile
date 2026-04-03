@@ -59,16 +59,35 @@ export function AllergenPickerModal({
 
   const [selected, setSelected] = useState<Set<string>>(new Set(initialSelected));
   const [query, setQuery] = useState('');
+  const [customAllergen, setCustomAllergen] = useState('');
 
   const filteredOptions = useMemo(() => filterAllergens(query), [query]);
+
+  // Custom allergens are any selected IDs not in the standard list
+  const standardIds = useMemo(() => new Set(ALLERGEN_OPTIONS.map(a => a.id)), []);
+  const customAllergens = useMemo(
+    () => Array.from(selected).filter(id => !standardIds.has(id)),
+    [selected, standardIds]
+  );
 
   // Reset state when modal opens
   React.useEffect(() => {
     if (visible) {
       setSelected(new Set(initialSelected));
       setQuery('');
+      setCustomAllergen('');
     }
   }, [visible, initialSelected]);
+
+  const addCustomAllergen = () => {
+    const trimmed = customAllergen.trim().toLowerCase().replace(/\s+/g, '_');
+    if (trimmed && !selected.has(trimmed)) {
+      const newSelected = new Set(selected);
+      newSelected.add(trimmed);
+      setSelected(newSelected);
+      setCustomAllergen('');
+    }
+  };
 
   const toggleAllergen = (id: string) => {
     const newSelected = new Set(selected);
@@ -194,10 +213,51 @@ export function AllergenPickerModal({
             })}
           </View>
 
+          {/* Custom "Other" allergen input */}
+          <Text variant="caption" color="secondary" style={[styles.sectionLabel, { marginTop: spacing.xl }]}>
+            OTHER ALLERGIES
+          </Text>
+          <View style={[styles.customInputRow, { borderColor: themeColors.border, backgroundColor: themeColors.backgroundSecondary }]}>
+            <TextInput
+              style={[styles.customInput, { color: themeColors.text }]}
+              placeholder="Type a custom allergy..."
+              placeholderTextColor={themeColors.textSecondary}
+              value={customAllergen}
+              onChangeText={setCustomAllergen}
+              onSubmitEditing={addCustomAllergen}
+              returnKeyType="done"
+            />
+            <TouchableOpacity
+              onPress={addCustomAllergen}
+              disabled={!customAllergen.trim()}
+              style={[styles.addButton, { backgroundColor: customAllergen.trim() ? themeColors.primary : themeColors.border }]}
+            >
+              <MaterialIcons name="add" size={20} color={customAllergen.trim() ? themeColors.textInverse : themeColors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          {customAllergens.length > 0 && (
+            <View style={styles.optionsGrid}>
+              {customAllergens.map((id) => (
+                <TouchableOpacity
+                  key={id}
+                  style={[styles.optionButton, { backgroundColor: themeColors.primary, borderColor: themeColors.primary }]}
+                  onPress={() => toggleAllergen(id)}
+                  activeOpacity={0.7}
+                >
+                  <Text variant="body" weight="semibold" style={{ color: themeColors.textInverse }}>
+                    {id.replace(/_/g, ' ')}
+                  </Text>
+                  <MaterialIcons name="close" size={18} color={themeColors.textInverse} style={styles.checkIcon} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
           {/* Helper text + link to Foods to Avoid */}
           <View style={styles.helperContainer}>
             <Text variant="caption" color="secondary" style={styles.helperText}>
-              For other sensitivities (e.g., beetroot), add them under Foods to Avoid.
+              Standard allergens filter by ingredient data. Custom allergies are sent to the AI as safety-critical exclusions.
             </Text>
             {onNavigateToFoodsToAvoid && (
               <TouchableOpacity
@@ -307,6 +367,25 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginTop: spacing.sm,
     paddingVertical: spacing.xs,
+  },
+  customInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingLeft: spacing.md,
+    gap: spacing.sm,
+    overflow: 'hidden',
+  },
+  customInput: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    fontSize: 16,
+  },
+  addButton: {
+    padding: spacing.md,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   footer: {
     padding: spacing.lg,

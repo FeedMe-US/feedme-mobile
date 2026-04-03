@@ -26,10 +26,11 @@ export interface AllergenOption {
 }
 
 /**
- * Standard allergen options — FDA top 9 major food allergens.
+ * Standard allergen options — FDA top 9 + international major allergens.
  * IDs are the backend-contract values (stored in allergen_exclusions).
  */
 export const ALLERGEN_OPTIONS: AllergenOption[] = [
+  // FDA Top 9
   { id: 'peanuts', name: 'Peanuts', synonyms: ['peanut', 'peanut butter', 'groundnut'] },
   { id: 'tree_nuts', name: 'Tree Nuts', synonyms: ['almond', 'cashew', 'walnut', 'pecan', 'pistachio', 'hazelnut', 'macadamia', 'brazil nut', 'nuts'] },
   { id: 'milk', name: 'Milk/Dairy', synonyms: ['dairy', 'cheese', 'butter', 'cream', 'yogurt', 'lactose', 'whey', 'casein'] },
@@ -39,9 +40,17 @@ export const ALLERGEN_OPTIONS: AllergenOption[] = [
   { id: 'eggs', name: 'Eggs', synonyms: ['egg', 'albumin', 'mayonnaise'] },
   { id: 'fish', name: 'Fish', synonyms: ['salmon', 'tuna', 'cod', 'tilapia', 'anchovy', 'bass', 'trout', 'halibut'] },
   { id: 'sesame', name: 'Sesame', synonyms: ['sesame seed', 'tahini', 'sesame oil', 'hummus'] },
+  // Additional international allergens (EU/Codex)
+  { id: 'mustard', name: 'Mustard', synonyms: ['mustard seed', 'mustard powder', 'dijon'] },
+  { id: 'celery', name: 'Celery', synonyms: ['celeriac', 'celery salt', 'celery seed'] },
+  { id: 'lupin', name: 'Lupin', synonyms: ['lupine', 'lupini beans'] },
+  { id: 'mollusks', name: 'Mollusks', synonyms: ['squid', 'octopus', 'snail', 'escargot', 'calamari'] },
+  { id: 'sulfites', name: 'Sulfites', synonyms: ['sulfur dioxide', 'sulphites', 'wine', 'dried fruit'] },
+  { id: 'corn', name: 'Corn', synonyms: ['maize', 'cornstarch', 'corn syrup', 'polenta', 'hominy', 'grits'] },
 ];
 
-/** Default disliked food options (shown when search query is empty) */
+/** Default disliked food options — common ingredients users avoid.
+ *  These are quick-select chips; users can also type custom keywords. */
 export const DISLIKED_FOOD_OPTIONS: PreferenceOption[] = [
   { id: 'mushrooms', name: 'Mushrooms' },
   { id: 'cilantro', name: 'Cilantro' },
@@ -53,4 +62,14 @@ export const DISLIKED_FOOD_OPTIONS: PreferenceOption[] = [
   { id: 'blue-cheese', name: 'Blue Cheese' },
   { id: 'anchovies', name: 'Anchovies' },
   { id: 'tomatoes', name: 'Tomatoes' },
+  { id: 'avocado', name: 'Avocado' },
+  { id: 'bell-pepper', name: 'Bell Pepper' },
+  { id: 'broccoli', name: 'Broccoli' },
+  { id: 'coconut', name: 'Coconut' },
+  { id: 'eggplant', name: 'Eggplant' },
+  { id: 'garlic', name: 'Garlic' },
+  { id: 'ginger', name: 'Ginger' },
+  { id: 'tofu', name: 'Tofu' },
+  { id: 'beets', name: 'Beets' },
+  { id: 'cucumber', name: 'Cucumber' },
 ];

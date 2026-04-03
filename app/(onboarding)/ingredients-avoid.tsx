@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors, spacing, radius } from '@/src/theme';
@@ -9,18 +9,28 @@ import { Screen } from '@/src/ui/Screen';
 import { MaterialIcons } from '@expo/vector-icons';
 import { saveOnboardingData } from '@/src/lib/onboardingData';
 import { DISLIKED_FOOD_OPTIONS } from '@/src/constants/preferences';
-import { useItemSearch } from '@/src/hooks/useItemSearch';
 
 export default function IngredientsAvoidScreen() {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light'];
   const router = useRouter();
   const [selectedIngredients, setSelectedIngredients] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState('');
 
-  const { query, setQuery, results, isLoading, hasNoResults, error } = useItemSearch({
-    defaults: DISLIKED_FOOD_OPTIONS,
-    debounceMs: 300,
-  });
+  // Local filtering of standard options
+  const filteredOptions = useMemo(() => {
+    if (!query.trim()) return DISLIKED_FOOD_OPTIONS;
+    const lower = query.trim().toLowerCase();
+    return DISLIKED_FOOD_OPTIONS.filter(opt => opt.name.toLowerCase().includes(lower));
+  }, [query]);
+
+  // Check if query matches any existing option or selection
+  const queryIsNew = useMemo(() => {
+    if (!query.trim()) return false;
+    const lower = query.trim().toLowerCase();
+    return !DISLIKED_FOOD_OPTIONS.some(opt => opt.name.toLowerCase() === lower)
+      && !selectedIngredients.has(query.trim());
+  }, [query, selectedIngredients]);
 
   const handleToggleIngredient = (name: string) => {
     const newSelection = new Set(selectedIngredients);
@@ -32,9 +42,11 @@ export default function IngredientsAvoidScreen() {
     setSelectedIngredients(newSelection);
   };
 
-  const handleSelectFromSearch = (item: { id: string; name: string }) => {
+  const addCustomKeyword = () => {
+    const trimmed = query.trim();
+    if (!trimmed || !queryIsNew) return;
     const newSelection = new Set(selectedIngredients);
-    newSelection.add(item.name);
+    newSelection.add(trimmed);
     setSelectedIngredients(newSelection);
     setQuery('');
   };
@@ -47,16 +59,15 @@ export default function IngredientsAvoidScreen() {
 
   const hasSelections = selectedIngredients.size > 0;
 
-  // Build display list: selected items that aren't in current results + current results
-  const selectedArray = Array.from(selectedIngredients);
-  const resultNames = new Set(results.map(r => r.name));
-  const extraSelected = selectedArray
-    .filter(name => !resultNames.has(name))
+  // Build display list: selected custom items (not in standard list) + standard options
+  const standardNames = new Set(DISLIKED_FOOD_OPTIONS.map(o => o.name));
+  const customSelected = Array.from(selectedIngredients)
+    .filter(name => !standardNames.has(name))
     .map(name => ({ id: name, name, isSelected: true }));
 
   const displayItems = [
-    ...extraSelected,
-    ...results.map(r => ({ id: r.id, name: r.name, isSelected: selectedIngredients.has(r.name) })),
+    ...customSelected,
+    ...filteredOptions.map(o => ({ id: o.id, name: o.name, isSelected: selectedIngredients.has(o.name) })),
   ];
 
   return (
@@ -95,37 +106,21 @@ export default function IngredientsAvoidScreen() {
                   borderColor: themeColors.border,
                 },
               ]}
-              placeholder="Search foods..."
+              placeholder="Search or type a keyword..."
               placeholderTextColor={themeColors.textSecondary}
               value={query}
               onChangeText={setQuery}
+              onSubmitEditing={addCustomKeyword}
               returnKeyType="done"
             />
-            {isLoading && (
-              <View style={styles.loadingIndicator}>
-                <ActivityIndicator size="small" color={themeColors.primary} />
-              </View>
+            {queryIsNew && (
+              <TouchableOpacity
+                onPress={addCustomKeyword}
+                style={[styles.addButton, { backgroundColor: themeColors.primary }]}>
+                <MaterialIcons name="add" size={18} color={themeColors.textInverse} />
+              </TouchableOpacity>
             )}
           </View>
-
-          {/* Error State */}
-          {error && (
-            <View style={styles.errorContainer}>
-              <MaterialIcons name="cloud-off" size={20} color={themeColors.textSecondary} />
-              <Text variant="caption" color="secondary" style={styles.errorText}>
-                {error}
-              </Text>
-            </View>
-          )}
-
-          {/* No Results (backend returned 0 — no free-text add allowed) */}
-          {hasNoResults && (
-            <View style={styles.noResults}>
-              <Text variant="body" color="secondary">
-                No matches found for &quot;{query}&quot;
-              </Text>
-            </View>
-          )}
 
           {/* Ingredient Options */}
           <View style={styles.optionsContainer}>
@@ -144,13 +139,7 @@ export default function IngredientsAvoidScreen() {
                     borderWidth: 1,
                   },
                 ]}
-                onPress={() => {
-                  if (item.isSelected) {
-                    handleToggleIngredient(item.name);
-                  } else {
-                    handleSelectFromSearch(item);
-                  }
-                }}
+                onPress={() => handleToggleIngredient(item.name)}
                 activeOpacity={0.7}>
                 <Text
                   variant="body"
@@ -228,24 +217,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     fontSize: 16,
   },
-  loadingIndicator: {
-    position: 'absolute',
-    right: spacing.lg,
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
-  },
-  errorText: {
-    flex: 1,
-  },
-  noResults: {
-    paddingVertical: spacing.md,
-    alignItems: 'center',
+  addButton: {
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    marginLeft: spacing.sm,
   },
   optionsContainer: {
     flexDirection: 'row',
