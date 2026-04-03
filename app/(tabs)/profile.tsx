@@ -62,7 +62,7 @@ export default function ProfileScreen() {
   const [showActivityPicker, setShowActivityPicker] = useState(false);
   const [dietStrictness, setDietStrictness] = useState<'strict' | 'balanced' | 'relaxed'>('balanced');
   const [showStrictnessPicker, setShowStrictnessPicker] = useState(false);
-  const [goalType, setGoalType] = useState('Lean Muscle Growth');
+  const [goalType, setGoalType] = useState('Maintain');
   const [showGoalTypePicker, setShowGoalTypePicker] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -99,7 +99,7 @@ export default function ProfileScreen() {
   const diningHalls = DINING_LOCATIONS.map(l => l.name);
   // Micronutrients available from backend (matching nutrition table columns)
   const vitamins = ['Vitamin D', 'Vitamin B12', 'Vitamin C', 'Iron', 'Calcium', 'Potassium', 'Vitamin A', 'Vitamin B6'];
-  const goalTypes = ['Cut', 'Maintain', 'Lean Muscle Growth', 'Bulk'];
+  const goalTypes = ['Bulk up', 'Get lean', 'Maintain', 'Perform better'];
 
   const [selectedRestrictions, setSelectedRestrictions] = useState<string[]>([]);
   const [allergenExclusions, setAllergenExclusions] = useState<string[]>([]); // Safety - hard filter (stored as IDs from onboarding)
@@ -199,10 +199,10 @@ export default function ProfileScreen() {
             // Map backend goal type to display value
             if (profile.goal_type) {
               const goalBackendToDisplay: Record<string, string> = {
-                'Bulk Up': 'Bulk',
-                'Get Lean': 'Cut',
+                'Bulk Up': 'Bulk up',
+                'Get Lean': 'Get lean',
                 'Maintain': 'Maintain',
-                'Perform Better': 'Lean Muscle Growth',
+                'Perform Better': 'Perform better',
               };
               setGoalType(goalBackendToDisplay[profile.goal_type] || profile.goal_type);
             }
@@ -273,12 +273,12 @@ export default function ProfileScreen() {
         }
         if (data.goal) {
           const goalMap: Record<string, string> = {
-            'bulk': 'Bulk',
-            'lean': 'Lean Muscle Growth',
+            'bulk': 'Bulk up',
+            'lean': 'Get lean',
             'maintain': 'Maintain',
-            'perform': 'Lean Muscle Growth',
+            'perform': 'Perform better',
           };
-          setGoalType(goalMap[data.goal] || 'Lean Muscle Growth');
+          setGoalType(goalMap[data.goal] || 'Maintain');
         }
         if (data.dietStrictness) {
           setDietStrictness(data.dietStrictness);
@@ -473,6 +473,40 @@ export default function ProfileScreen() {
     saveDietStrictness();
   }, [dietStrictness, isAuthenticated, isInitialLoad]);
 
+  // Save goal type when it changes - sync to backend and local storage
+  React.useEffect(() => {
+    if (isInitialLoad) return;
+
+    const goalDisplayToBackend: Record<string, string> = {
+      'Bulk up': 'Bulk Up',
+      'Get lean': 'Get Lean',
+      'Maintain': 'Maintain',
+      'Perform better': 'Perform Better',
+    };
+    const goalDisplayToOnboarding: Record<string, string> = {
+      'Bulk up': 'bulk',
+      'Get lean': 'lean',
+      'Maintain': 'maintain',
+      'Perform better': 'perform',
+    };
+
+    const saveGoalType = async () => {
+      const backendKey = goalDisplayToBackend[goalType] || goalType;
+      const onboardingKey = goalDisplayToOnboarding[goalType] || 'maintain';
+
+      if (isAuthenticated) {
+        try {
+          await userService.updateProfile({ goal_type: backendKey });
+        } catch (error) {
+          console.warn('[profile] Failed to sync goal type to backend:', error);
+        }
+      }
+      await saveOnboardingData({ goal: onboardingKey as 'bulk' | 'lean' | 'maintain' | 'perform' });
+    };
+
+    saveGoalType();
+  }, [goalType, isAuthenticated, isInitialLoad]);
+
   const toggleSelection = (
     item: string,
     selected: string[],
@@ -522,35 +556,25 @@ export default function ProfileScreen() {
 
     const tdee = bmr * (activityMultipliers[activityLevel] || 1.55);
     
-    // Adjust for goal type
-    let targetCalories = tdee;
-    if (goalType === 'Cut') {
-      targetCalories = tdee - 500;
-    } else if (goalType === 'Bulk') {
-      targetCalories = tdee + 500;
-    } else if (goalType === 'Lean Muscle Growth') {
-      targetCalories = tdee + 300;
-    } else {
-      // Maintain
-      targetCalories = tdee;
-    }
+    // Adjust for goal type — percentage-based, matching backend Mifflin-St Jeor calculation
+    const goalCalorieAdjustments: Record<string, number> = {
+      'Bulk up': 0.15,           // +15% of TDEE
+      'Get lean': -0.20,         // -20% of TDEE
+      'Maintain': 0.0,
+      'Perform better': 0.05,    // +5% of TDEE
+    };
+    const calorieAdj = goalCalorieAdjustments[goalType] ?? 0;
+    const targetCalories = tdee * (1 + calorieAdj);
 
-    // Calculate protein based on body weight (g per lb of bodyweight)
-    // Using evidence-based multipliers matching backend (targets.py)
-    // References: Morton et al. (2018), Helms et al. (2014)
+    // Protein per lb of bodyweight — matching backend multipliers
+    const goalProteinMultipliers: Record<string, number> = {
+      'Bulk up': 1.0,
+      'Get lean': 1.0,
+      'Maintain': 0.7,
+      'Perform better': 0.9,
+    };
     const weightLbs = parseFloat(weight) || 165;
-    let proteinPerLb = 1.0; // Default: 1.0g per lb (Maintain)
-
-    if (goalType === 'Cut') {
-      proteinPerLb = 1.1; // Higher protein when cutting to preserve muscle (Get Lean)
-    } else if (goalType === 'Bulk') {
-      proteinPerLb = 1.3; // Higher protein for muscle building (Bulk Up)
-    } else if (goalType === 'Lean Muscle Growth') {
-      proteinPerLb = 1.1; // Moderate-high protein for athletes (Perform Better)
-    } else {
-      // Maintain
-      proteinPerLb = 1.0;
-    }
+    const proteinPerLb = goalProteinMultipliers[goalType] ?? 0.7;
 
     // Calculate protein in grams
     const protein = Math.round(weightLbs * proteinPerLb);
@@ -560,7 +584,7 @@ export default function ProfileScreen() {
     const remainingCalories = targetCalories - proteinCalories;
 
     // Fat should be ~25-30% of total calories for hormone health
-    const fatPercent = goalType === 'Cut' ? 0.25 : 0.3;
+    const fatPercent = 0.25;  // 25% of calories from fat — matches backend
     const fats = Math.round((targetCalories * fatPercent) / 9);
     const fatCalories = fats * 9;
 
