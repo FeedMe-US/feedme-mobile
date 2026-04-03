@@ -128,13 +128,12 @@ export function getCurrentOrNextMealPeriod(hall: DiningHall): MealPeriod | null 
   if (hall.current_meal) {
     return hall.current_meal as MealPeriod;
   }
-  // Fall back to next_meal if hall is between periods
+  // Fall back to next_meal if hall is between periods but has an upcoming period today
   if (hall.next_meal) {
     return hall.next_meal as MealPeriod;
   }
-  // Fall back to first available period
-  const available = getAvailableMealPeriods(hall);
-  return available.length > 0 ? available[0] : null;
+  // No current or next meal — hall is closed for the day
+  return null;
 }
 
 /**
