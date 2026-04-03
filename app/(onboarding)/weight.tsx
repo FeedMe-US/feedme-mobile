@@ -48,6 +48,9 @@ export default function WeightScreen() {
       } else {
         defaultGoal = savedWeight;
         if (data.goal === 'bulk') defaultGoal = savedWeight + 10;
+        else if (data.goal === 'cut') defaultGoal = savedWeight - 6;
+        else if (data.goal === 'lean_muscle') defaultGoal = savedWeight + 4;
+        // Legacy keys
         else if (data.goal === 'lean') defaultGoal = savedWeight - 6;
         else if (data.goal === 'perform') defaultGoal = savedWeight + 4;
       }
@@ -108,17 +111,15 @@ export default function WeightScreen() {
 
   const handleContinue = async () => {
     // Auto-determine goal type from weight difference
-    let suggestedGoal: 'bulk' | 'lean' | 'maintain' | 'perform' = 'maintain';
+    let suggestedGoal: 'lean_muscle' | 'cut' | 'maintain' | 'bulk' = 'maintain';
     const diff = goalWeight - weight;
 
-    if (diff <= -5) {
-      suggestedGoal = 'lean';
-    } else if (diff >= -4 && diff <= -2) {
-      suggestedGoal = 'lean';
+    if (diff <= -2) {
+      suggestedGoal = 'cut';
     } else if (diff >= -1 && diff <= 2) {
       suggestedGoal = 'maintain';
     } else if (diff >= 3 && diff <= 8) {
-      suggestedGoal = 'lean';
+      suggestedGoal = 'lean_muscle';
     } else if (diff >= 9) {
       suggestedGoal = 'bulk';
     }

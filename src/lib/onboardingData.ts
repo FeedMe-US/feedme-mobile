@@ -10,7 +10,7 @@ const ONBOARDING_DATA_KEY = '@onboarding_data';
 
 export interface OnboardingData {
   // Goal
-  goal?: 'bulk' | 'lean' | 'maintain' | 'perform';
+  goal?: 'lean_muscle' | 'cut' | 'maintain' | 'bulk';
   
   // Personal info
   sex?: 'male' | 'female';
@@ -115,12 +115,15 @@ export function onboardingDataToProfile(data: OnboardingData) {
     'very': 'Very Active',
   };
 
-  // Map goal types
+  // Map goal types — canonical names match backend
   const goalMap: Record<string, string> = {
-    'bulk': 'Bulk Up',
-    'lean': 'Get Lean',
+    'lean_muscle': 'Lean Muscle Growth',
+    'cut': 'Cut',
     'maintain': 'Maintain',
-    'perform': 'Perform Better',
+    'bulk': 'Bulk',
+    // Legacy keys (old onboarding data in AsyncStorage)
+    'lean': 'Cut',
+    'perform': 'Lean Muscle Growth',
   };
 
   // Build slug→ID map from the shared constant (includes legacy aliases via SLUG_TO_NAME)

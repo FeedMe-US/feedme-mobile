@@ -99,7 +99,7 @@ export default function ProfileScreen() {
   const diningHalls = DINING_LOCATIONS.map(l => l.name);
   // Micronutrients available from backend (matching nutrition table columns)
   const vitamins = ['Vitamin D', 'Vitamin B12', 'Vitamin C', 'Iron', 'Calcium', 'Potassium', 'Vitamin A', 'Vitamin B6'];
-  const goalTypes = ['Bulk up', 'Get lean', 'Maintain', 'Perform better'];
+  const goalTypes = ['Lean Muscle Growth', 'Cut', 'Maintain', 'Bulk'];
 
   const [selectedRestrictions, setSelectedRestrictions] = useState<string[]>([]);
   const [allergenExclusions, setAllergenExclusions] = useState<string[]>([]); // Safety - hard filter (stored as IDs from onboarding)
@@ -199,10 +199,15 @@ export default function ProfileScreen() {
             // Map backend goal type to display value
             if (profile.goal_type) {
               const goalBackendToDisplay: Record<string, string> = {
-                'Bulk Up': 'Bulk up',
-                'Get Lean': 'Get lean',
+                // Canonical
+                'Lean Muscle Growth': 'Lean Muscle Growth',
+                'Cut': 'Cut',
                 'Maintain': 'Maintain',
-                'Perform Better': 'Perform better',
+                'Bulk': 'Bulk',
+                // Legacy DB values
+                'Bulk Up': 'Bulk',
+                'Get Lean': 'Cut',
+                'Perform Better': 'Lean Muscle Growth',
               };
               setGoalType(goalBackendToDisplay[profile.goal_type] || profile.goal_type);
             }
@@ -273,10 +278,13 @@ export default function ProfileScreen() {
         }
         if (data.goal) {
           const goalMap: Record<string, string> = {
-            'bulk': 'Bulk up',
-            'lean': 'Get lean',
+            'lean_muscle': 'Lean Muscle Growth',
+            'cut': 'Cut',
             'maintain': 'Maintain',
-            'perform': 'Perform better',
+            'bulk': 'Bulk',
+            // Legacy keys
+            'lean': 'Cut',
+            'perform': 'Lean Muscle Growth',
           };
           setGoalType(goalMap[data.goal] || 'Maintain');
         }
@@ -478,16 +486,16 @@ export default function ProfileScreen() {
     if (isInitialLoad) return;
 
     const goalDisplayToBackend: Record<string, string> = {
-      'Bulk up': 'Bulk Up',
-      'Get lean': 'Get Lean',
+      'Lean Muscle Growth': 'Lean Muscle Growth',
+      'Cut': 'Cut',
       'Maintain': 'Maintain',
-      'Perform better': 'Perform Better',
+      'Bulk': 'Bulk',
     };
     const goalDisplayToOnboarding: Record<string, string> = {
-      'Bulk up': 'bulk',
-      'Get lean': 'lean',
+      'Lean Muscle Growth': 'lean_muscle',
+      'Cut': 'cut',
       'Maintain': 'maintain',
-      'Perform better': 'perform',
+      'Bulk': 'bulk',
     };
 
     const saveGoalType = async () => {
@@ -501,7 +509,7 @@ export default function ProfileScreen() {
           console.warn('[profile] Failed to sync goal type to backend:', error);
         }
       }
-      await saveOnboardingData({ goal: onboardingKey as 'bulk' | 'lean' | 'maintain' | 'perform' });
+      await saveOnboardingData({ goal: onboardingKey as 'lean_muscle' | 'cut' | 'maintain' | 'bulk' });
     };
 
     saveGoalType();
@@ -558,20 +566,20 @@ export default function ProfileScreen() {
     
     // Adjust for goal type — percentage-based, matching backend Mifflin-St Jeor calculation
     const goalCalorieAdjustments: Record<string, number> = {
-      'Bulk up': 0.15,           // +15% of TDEE
-      'Get lean': -0.20,         // -20% of TDEE
+      'Lean Muscle Growth': 0.05, // +5% of TDEE
+      'Cut': -0.20,               // -20% of TDEE
       'Maintain': 0.0,
-      'Perform better': 0.05,    // +5% of TDEE
+      'Bulk': 0.15,               // +15% of TDEE
     };
     const calorieAdj = goalCalorieAdjustments[goalType] ?? 0;
     const targetCalories = tdee * (1 + calorieAdj);
 
     // Protein per lb of bodyweight — matching backend multipliers
     const goalProteinMultipliers: Record<string, number> = {
-      'Bulk up': 1.0,
-      'Get lean': 1.0,
+      'Lean Muscle Growth': 1.1,  // highest protein for lean gains
+      'Cut': 1.0,
       'Maintain': 0.7,
-      'Perform better': 0.9,
+      'Bulk': 1.0,
     };
     const weightLbs = parseFloat(weight) || 165;
     const proteinPerLb = goalProteinMultipliers[goalType] ?? 0.7;
