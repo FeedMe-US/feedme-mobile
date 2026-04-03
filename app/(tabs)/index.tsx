@@ -8,6 +8,7 @@ import { Chip } from '@/src/components/Chip';
 import { MacroRing } from '@/src/components/MacroRing';
 import { MealCard } from '@/src/components/MealCard';
 import { ClosedHallCard } from '@/src/components/ClosedHallCard';
+import { SkeletonCard } from '@/src/components/SkeletonCard';
 import { MealRecommendation, mealService, MealPeriod } from '@/src/services/mealService';
 import { useDailyTracking } from '@/src/store/DailyTrackingContext';
 import { colors, spacing, radius } from '@/src/theme';
@@ -21,7 +22,7 @@ import { getCurrentOrNextMealPeriod } from '@/src/utils/mealPeriodUtils';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, TextInput, ActivityIndicator, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View, TextInput, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { userService } from '@/src/services/userService';
 import { getOnboardingData } from '@/src/lib/onboardingData';
 import type { DiningHall } from '@/src/services/mealService';
@@ -49,6 +50,11 @@ export default function HomeScreen() {
   const [recommendedMeal, setRecommendedMeal] = useState<MealRecommendation | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const lastGenerationKey = useRef<string>('');
+
+  // Cache recent recommendations so switching back to a hall is instant.
+  // Map of generationKey → { rec, timestamp }. Entries expire after 2 minutes.
+  const recCache = useRef<Map<string, { rec: MealRecommendation; ts: number }>>(new Map());
+  const REC_CACHE_TTL_MS = 2 * 60 * 1000;
 
   const [likedMeals, setLikedMeals] = useState<Set<string>>(new Set());
   const [greeting, setGreeting] = useState('Good Evening');
@@ -111,6 +117,21 @@ export default function HomeScreen() {
       effectiveMealPeriod = hallMealPeriod;
     }
 
+    // Build cache key for this hall + period combination
+    const cacheKey = `${selectedHallMode}-${selectedHallSlug || 'none'}-${effectiveMealPeriod}`;
+
+    // Check cache — if a fresh recommendation exists, use it instantly
+    if (!excludedRecipeIds?.length) {
+      const cached = recCache.current.get(cacheKey);
+      if (cached && Date.now() - cached.ts < REC_CACHE_TTL_MS) {
+        setRecommendedMeal(cached.rec);
+        haptics.light();
+        return;
+      }
+    }
+
+    // Clear the old recommendation so the skeleton card renders
+    setRecommendedMeal(null);
     setIsGenerating(true);
     try {
       const result = await mealService.getRecommendedMealWithOptions(
@@ -123,6 +144,8 @@ export default function HomeScreen() {
         }
       );
       setRecommendedMeal(result);
+      // Cache the result for instant recall when switching back
+      recCache.current.set(cacheKey, { rec: result, ts: Date.now() });
       haptics.success();
     } catch (error) {
       console.error('Failed to generate recommendation:', error);
@@ -771,12 +794,7 @@ useFocusEffect(
 
         {/* Recommended Meal Card - show loading state or meal card */}
         {isGenerating && !recommendedMeal ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={themeColors.primary} />
-            <Text variant="body" color="secondary" style={styles.loadingText}>
-              Generating your meal...
-            </Text>
-          </View>
+          <SkeletonCard />
         ) : null}
 
         {/* Recommended Meal Card or Closed Message */}
@@ -1172,16 +1190,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
-  },
-  // Loading state
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xl,
-    marginTop: spacing.lg,
-  },
-  loadingText: {
-    marginTop: spacing.md,
   },
   // Craving button section
   cravingButtonSection: {
