@@ -8,7 +8,7 @@ import { Button } from '@/src/ui/Button';
 import { Screen } from '@/src/ui/Screen';
 import { saveOnboardingData } from '@/src/lib/onboardingData';
 
-type GoalOption = 'bulk' | 'lean' | 'maintain' | 'perform';
+type GoalOption = 'lean_muscle' | 'cut' | 'maintain' | 'bulk';
 
 interface GoalCard {
   id: GoalOption;
@@ -18,13 +18,13 @@ interface GoalCard {
 
 const goalOptions: GoalCard[] = [
   {
-    id: 'bulk',
-    title: 'Bulk up',
-    description: 'Build muscle and gain strength',
+    id: 'lean_muscle',
+    title: 'Lean Muscle Growth',
+    description: 'Slight surplus with high protein for lean gains',
   },
   {
-    id: 'lean',
-    title: 'Get lean',
+    id: 'cut',
+    title: 'Cut',
     description: 'Lose fat while maintaining muscle',
   },
   {
@@ -33,9 +33,9 @@ const goalOptions: GoalCard[] = [
     description: 'Stay at your current weight',
   },
   {
-    id: 'perform',
-    title: 'Perform better',
-    description: 'Optimize for athletic performance',
+    id: 'bulk',
+    title: 'Bulk',
+    description: 'Maximize muscle and strength gains',
   },
 ];
 
