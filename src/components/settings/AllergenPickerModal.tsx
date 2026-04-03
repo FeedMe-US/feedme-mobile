@@ -137,8 +137,8 @@ export function AllergenPickerModal({
         {/* Warning Banner */}
         <View style={[styles.warningBanner, { backgroundColor: '#FEF3C7' }]}>
           <MaterialIcons name="warning" size={20} color="#D97706" />
-          <Text variant="caption" style={styles.warningText}>
-            Foods containing these allergens will <Text weight="bold">never</Text> appear in your recommendations.
+          <Text variant="caption" style={[styles.warningText, { color: '#92400E' }]}>
+            Foods containing these allergens will <Text weight="bold" style={{ color: '#92400E' }}>never</Text> appear in your recommendations.
           </Text>
         </View>
 
