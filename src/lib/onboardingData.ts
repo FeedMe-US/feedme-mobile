@@ -4,6 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DINING_LOCATIONS, SLUG_TO_NAME } from '@/src/constants/diningLocations';
 
 const ONBOARDING_DATA_KEY = '@onboarding_data';
 
@@ -122,40 +123,20 @@ export function onboardingDataToProfile(data: OnboardingData) {
     'perform': 'Perform Better',
   };
 
-  // Convert dining location slugs to IDs (must match database IDs!)
-  const locationSlugToId: Record<string, number> = {
-    // Residential dining
-    'de-neve': 28,
-    'de-neve-dining': 28,
-    'b-plate': 29,
-    'bruin-plate': 29,
-    'epicuria': 31,
-    'epicuria-at-covel': 31,
-    'feast': 30,
-    'spice-kitchen': 30,
-    // Hill / campus restaurants
-    'rendezvous': 39,
-    'the-study': 37,
-    'the-study-at-hedrick': 37,
-    'the-drey': 38,
-    'bruin-cafe': 34,
-    'cafe-1919': 36,
-    'epicuria-at-ackerman': 41,
-    // ASUCLA / LuValle / satellite locations
-    'anderson-cafe': 100,
-    'bombshelter': 101,
-    'luvalle-fusion': 102,
-    'luvalle-pizza': 103,
-    'luvalle-epazote': 104,
-    'luvalle-burger': 105,
-    'luvalle-poke': 106,
-    'luvalle-panini': 107,
-    'synapse': 108,
-  };
+  // Build slug→ID map from the shared constant (includes legacy aliases via SLUG_TO_NAME)
+  const locationSlugToId: Record<string, number> = Object.fromEntries([
+    ...DINING_LOCATIONS.map(l => [l.slug, l.id]),
+    // Legacy slug aliases resolve through SLUG_TO_NAME → find matching location
+    ...Object.keys(SLUG_TO_NAME).map(slug => {
+      const name = SLUG_TO_NAME[slug];
+      const loc = DINING_LOCATIONS.find(l => l.name === name);
+      return [slug, loc?.id] as const;
+    }).filter(([, id]) => id !== undefined),
+  ]);
 
   const preferredLocationIds = data.preferredDiningLocations
     ?.map(slug => locationSlugToId[slug])
-    .filter(id => id !== undefined) || [];
+    .filter((id): id is number => id !== undefined) || [];
 
   // Calculate height - check for undefined/null explicitly since 0 is valid for inches
   const heightInches = data.heightFeet !== undefined && data.heightFeet !== null
@@ -187,7 +168,7 @@ export function onboardingDataToProfile(data: OnboardingData) {
     preferred_locations: preferredLocationIds,
     meals_per_day: data.mealsPerDay,
     meal_times: mealTimes,
-    macro_adherence_tier: data.dietStrictness,  // 'strict' | 'balanced' | 'relaxed'
+    macro_adherence: data.dietStrictness,  // 'strict' | 'balanced' | 'relaxed'
   };
 }
 

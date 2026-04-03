@@ -2035,7 +2035,7 @@ export interface components {
             /** Created At */
             created_at?: string | null;
             /** Macro Adherence Tier */
-            macro_adherence_tier?: ("strict" | "balanced" | "relaxed") | null;
+            macro_adherence?: ("strict" | "balanced" | "relaxed") | null;
         };
         /**
          * UserProfileUpdateRequest
@@ -2084,7 +2084,7 @@ export interface components {
             /** Protein Multiplier */
             protein_multiplier?: number | null;
             /** Macro Adherence Tier */
-            macro_adherence_tier?: ("strict" | "balanced" | "relaxed") | null;
+            macro_adherence?: ("strict" | "balanced" | "relaxed") | null;
         };
         /**
          * UserTargetsResponse

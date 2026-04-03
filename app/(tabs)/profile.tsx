@@ -32,6 +32,7 @@ import { userService } from '@/src/services/userService';
 import { ItemManagementModal, ItemOption } from '@/src/components/settings/ItemManagementModal';
 import { AllergenPickerModal } from '@/src/components/settings/AllergenPickerModal';
 import { ALLERGEN_OPTIONS, DISLIKED_FOOD_OPTIONS } from '@/src/constants/preferences';
+import { DINING_LOCATIONS, ID_TO_NAME, SLUG_TO_NAME } from '@/src/constants/diningLocations';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
@@ -95,29 +96,7 @@ export default function ProfileScreen() {
     Object.entries(vitaminDisplayToKey).map(([k, v]) => [v, k])
   );
 
-  const diningHalls = [
-    // Hill & residential dining halls (canonical names matching database)
-    'De Neve Dining',
-    'BPlate',
-    'Feast',
-    'Epicuria at Covel',
-    'Epicuria at Ackerman',
-    // Hill boutique locations
-    'Rendezvous',
-    'The Study',
-    'The Drey',
-    'BCafe',
-    'Cafe 1919',
-    // ASUCLA / LuValle / satellite locations
-    'Anderson Café',
-    'Synapse',
-    'LuValle: Fusion',
-    'LuValle: All Rise Pizza',
-    'LuValle: Epazote',
-    'LuValle: Burger Assemble',
-    'LuValle: Northern Lights Poke',
-    'LuValle: Northern Lights Panini',
-  ];
+  const diningHalls = DINING_LOCATIONS.map(l => l.name);
   // Micronutrients available from backend (matching nutrition table columns)
   const vitamins = ['Vitamin D', 'Vitamin B12', 'Vitamin C', 'Iron', 'Calcium', 'Potassium', 'Vitamin A', 'Vitamin B6'];
   const goalTypes = ['Cut', 'Maintain', 'Lean Muscle Growth', 'Bulk'];
@@ -154,7 +133,6 @@ export default function ProfileScreen() {
   // Load profile data - prefer backend if authenticated, fall back to local
   React.useEffect(() => {
     const loadProfileData = async () => {
-      const { ID_TO_NAME: locationIdToName, SLUG_TO_NAME: locationSlugToName } = require('@/src/constants/diningLocations');
 
       try {
         // If authenticated, try to fetch from backend first
@@ -173,7 +151,7 @@ export default function ProfileScreen() {
             allergen_exclusions?: string[];
             preferred_locations?: number[];
             tracked_micronutrients?: string[];
-            macro_adherence_tier?: 'strict' | 'balanced' | 'relaxed' | null;
+            macro_adherence?: 'strict' | 'balanced' | 'relaxed' | null;
             targets?: {
               daily_calories: number;
               daily_protein_g: number;
@@ -228,9 +206,9 @@ export default function ProfileScreen() {
               };
               setGoalType(goalBackendToDisplay[profile.goal_type] || profile.goal_type);
             }
-            // Map backend macro_adherence_tier to diet strictness
-            if (profile.macro_adherence_tier) {
-              setDietStrictness(profile.macro_adherence_tier as 'strict' | 'balanced' | 'relaxed');
+            // Map backend macro_adherence to diet strictness
+            if (profile.macro_adherence) {
+              setDietStrictness(profile.macro_adherence as 'strict' | 'balanced' | 'relaxed');
             }
             if (profile.dietary_restrictions?.length) {
               setSelectedRestrictions(profile.dietary_restrictions);
@@ -242,7 +220,7 @@ export default function ProfileScreen() {
             // Backend doesn't have a separate endpoint yet, so we use local data
             if (profile.preferred_locations?.length) {
               const mappedHalls = profile.preferred_locations
-                .map(id => locationIdToName[id])
+                .map(id => ID_TO_NAME[id])
                 .filter(Boolean) as string[];
               if (mappedHalls.length > 0) setSelectedHalls(mappedHalls);
             }
@@ -318,7 +296,7 @@ export default function ProfileScreen() {
         }
         if (data.preferredDiningLocations?.length) {
           const mappedHalls = data.preferredDiningLocations
-            .map(slug => locationSlugToName[slug])
+            .map(slug => SLUG_TO_NAME[slug])
             .filter(Boolean) as string[];
           if (mappedHalls.length > 0) setSelectedHalls(mappedHalls);
         }
@@ -366,73 +344,17 @@ export default function ProfileScreen() {
     if (isInitialLoad) return; // Don't save on initial load
 
     const savePreferredHalls = async () => {
-      // Map display names to location IDs (for backend)
-      const nameToLocationId: Record<string, number> = {
-        // Residential dining
-        'De Neve': 28,
-        'De Neve Dining': 28,
-        'BPlate': 29,
-        'Bruin Plate': 29,
-        'Feast': 30,
-        'Epicuria': 31,
-        'Epicuria at Covel': 31,
-        // Hill / campus restaurants
-        'BCafe': 34,
-        'Bruin Cafe': 34, // backward compat
-        'Cafe 1919': 36,
-        'The Study': 37,
-        'The Drey': 38,
-        'Rendezvous': 39,
-        'Epicuria at Ackerman': 41,
-        // ASUCLA / LuValle / satellite locations
-        'Anderson Café': 100,
-        'Court of Sciences: Bombshelter': 101,
-        'LuValle: Fusion': 102,
-        'LuValle: All Rise Pizza': 103,
-        'LuValle: Epazote': 104,
-        'LuValle: Burger Assemble': 105,
-        'LuValle: Northern Lights Poke': 106,
-        'LuValle: Northern Lights Panini': 107,
-        'Synapse': 108,
-      };
-
-      // Map display names to slugs (for local storage)
-      const nameToSlug: Record<string, string> = {
-        // Residential dining
-        'De Neve': 'de-neve-dining',
-        'De Neve Dining': 'de-neve-dining',
-        'BPlate': 'b-plate',
-        'Bruin Plate': 'bruin-plate',
-        'Feast': 'spice-kitchen',
-        'Epicuria': 'epicuria-at-covel',
-        'Epicuria at Covel': 'epicuria-at-covel',
-        'Epicuria at Ackerman': 'epicuria-at-ackerman',
-        // Hill / campus restaurants
-        'Rendezvous': 'rendezvous',
-        'The Study': 'the-study-at-hedrick',
-        'The Drey': 'the-drey',
-        'BCafe': 'bruin-cafe',
-        'Bruin Cafe': 'bruin-cafe', // backward compat
-        'Cafe 1919': 'cafe-1919',
-        // ASUCLA / LuValle / satellite locations
-        'Anderson Café': 'anderson-cafe',
-        'Court of Sciences: Bombshelter': 'bombshelter',
-        'Synapse': 'synapse',
-        'LuValle: Fusion': 'luvalle-fusion',
-        'LuValle: All Rise Pizza': 'luvalle-pizza',
-        'LuValle: Epazote': 'luvalle-epazote',
-        'LuValle: Burger Assemble': 'luvalle-burger',
-        'LuValle: Northern Lights Poke': 'luvalle-poke',
-        'LuValle: Northern Lights Panini': 'luvalle-panini',
-      };
+      // Derive lookup maps from the shared DINING_LOCATIONS constant
+      const nameToLocationId = Object.fromEntries(DINING_LOCATIONS.map(l => [l.name, l.id]));
+      const nameToSlug = Object.fromEntries(DINING_LOCATIONS.map(l => [l.name, l.slug]));
 
       const locationIds = selectedHalls
         .map(name => nameToLocationId[name])
-        .filter(id => id !== undefined) as number[];
+        .filter((id): id is number => id !== undefined);
 
       const locationSlugs = selectedHalls
         .map(name => nameToSlug[name])
-        .filter(slug => slug !== undefined) as string[];
+        .filter(Boolean);
 
       try {
         // Save to backend if authenticated
@@ -539,7 +461,7 @@ export default function ProfileScreen() {
       // Save to backend if authenticated
       if (isAuthenticated) {
         try {
-          await userService.updateProfile({ macro_adherence_tier: dietStrictness });
+          await userService.updateProfile({ macro_adherence: dietStrictness });
         } catch (error) {
           console.warn('[profile] Failed to sync diet strictness to backend:', error);
         }
