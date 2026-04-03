@@ -8,66 +8,15 @@ import { Button } from '@/src/ui/Button';
 import { Screen } from '@/src/ui/Screen';
 import { MaterialIcons } from '@expo/vector-icons';
 import { saveOnboardingData } from '@/src/lib/onboardingData';
-
-type DiningLocation =
-  // Residential dining (legacy slugs preserved for compatibility)
-  | 'de-neve'
-  | 'de-neve-dining'
-  | 'b-plate'
-  | 'bruin-plate'
-  | 'epicuria'
-  | 'epicuria-at-covel'
-  | 'feast'
-  | 'spice-kitchen'
-  // Hill / campus restaurants
-  | 'rendezvous'
-  | 'the-study'
-  | 'the-study-at-hedrick'
-  | 'the-drey'
-  | 'bruin-cafe'
-  | 'cafe-1919'
-  | 'epicuria-at-ackerman'
-  // ASUCLA / LuValle / satellite locations
-  | 'anderson-cafe'
-  | 'luvalle-fusion'
-  | 'luvalle-pizza'
-  | 'luvalle-epazote'
-  | 'luvalle-burger'
-  | 'luvalle-poke'
-  | 'luvalle-panini'
-  | 'synapse';
-
-const diningLocations: { id: DiningLocation; name: string }[] = [
-  // Residential dining
-  { id: 'de-neve-dining', name: 'De Neve Dining' },
-  { id: 'b-plate', name: 'BPlate' },
-  { id: 'epicuria-at-covel', name: 'Epicuria at Covel' },
-  { id: 'spice-kitchen', name: 'Feast' },
-  // Hill / campus restaurants
-  { id: 'rendezvous', name: 'Rendezvous' },
-  { id: 'the-study-at-hedrick', name: 'The Study' },
-  { id: 'the-drey', name: 'The Drey' },
-  { id: 'bruin-cafe', name: 'BCafe' },
-  { id: 'cafe-1919', name: 'Cafe 1919' },
-  { id: 'epicuria-at-ackerman', name: 'Epicuria at Ackerman' },
-  // ASUCLA / LuValle / satellite locations
-  { id: 'anderson-cafe', name: 'Anderson Café' },
-  { id: 'luvalle-fusion', name: 'LuValle: Fusion' },
-  { id: 'luvalle-pizza', name: 'LuValle: All Rise Pizza' },
-  { id: 'luvalle-epazote', name: 'LuValle: Epazote' },
-  { id: 'luvalle-burger', name: 'LuValle: Burger Assemble' },
-  { id: 'luvalle-poke', name: 'LuValle: Northern Lights Poke' },
-  { id: 'luvalle-panini', name: 'LuValle: Northern Lights Panini' },
-  { id: 'synapse', name: 'Synapse' },
-];
+import { DINING_LOCATIONS, type DiningLocationSlug } from '@/src/constants/diningLocations';
 
 export default function DiningLocationsScreen() {
   const colorScheme = useColorScheme();
   const themeColors = colors[colorScheme ?? 'light'];
   const router = useRouter();
-  const [selectedLocations, setSelectedLocations] = useState<Set<DiningLocation>>(new Set());
+  const [selectedLocations, setSelectedLocations] = useState<Set<DiningLocationSlug>>(new Set());
 
-  const handleToggleLocation = (locationId: DiningLocation) => {
+  const handleToggleLocation = (locationId: DiningLocationSlug) => {
     const newSelection = new Set(selectedLocations);
     if (newSelection.has(locationId)) {
       newSelection.delete(locationId);
@@ -111,11 +60,11 @@ export default function DiningLocationsScreen() {
 
           {/* Dining Location Options */}
           <View style={styles.optionsContainer}>
-            {diningLocations.map((location) => {
-              const isSelected = selectedLocations.has(location.id);
+            {DINING_LOCATIONS.map((location) => {
+              const isSelected = selectedLocations.has(location.slug);
               return (
                 <TouchableOpacity
-                  key={location.id}
+                  key={location.slug}
                   style={[
                     styles.optionChip,
                     {
@@ -128,7 +77,7 @@ export default function DiningLocationsScreen() {
                       borderWidth: 1,
                     },
                   ]}
-                  onPress={() => handleToggleLocation(location.id)}
+                  onPress={() => handleToggleLocation(location.slug)}
                   activeOpacity={0.7}>
                   <Text
                     variant="body"
