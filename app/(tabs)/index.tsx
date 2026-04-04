@@ -302,8 +302,12 @@ useFocusEffect(
         }
       } catch (error) {
         console.warn('[Home] Error loading preferred halls, using local data:', error);
-        const onboardingData = await getOnboardingData();
-        preferredSlugs = onboardingData.preferredDiningLocations || [];
+        try {
+          const onboardingData = await getOnboardingData();
+          preferredSlugs = onboardingData.preferredDiningLocations || [];
+        } catch {
+          console.warn('[Home] Onboarding data also unavailable');
+        }
       }
 
       // Normalize slugs (map b-plate to bruin-plate, etc.)
@@ -318,6 +322,11 @@ useFocusEffect(
 
       // Deduplicate preferred slugs after normalization to avoid duplicates
       preferredSlugs = Array.from(new Set(preferredSlugs));
+
+      // If no preferred halls could be determined, show all halls
+      if (preferredSlugs.length === 0) {
+        preferredSlugs = allHalls.map(h => h.slug);
+      }
 
       // Create a complete mapping of all possible dining halls (fallback data)
       const allPossibleHalls: DiningHall[] = [
@@ -418,12 +427,21 @@ useFocusEffect(
       }
     } catch (error) {
       console.error('Error loading dining halls:', error);
-      // Fallback to all known halls
-      setDiningHalls([
+      // Fallback — still try to get API data for open/closed status
+      const fallbackSlugs = [
         'bruin-plate', 'de-neve-dining', 'epicuria-at-covel',
         'spice-kitchen', 'rendezvous', 'the-study-at-hedrick',
         'the-drey', 'bruin-cafe', 'cafe-1919'
-      ]);
+      ];
+      try {
+        const apiHalls = await mealService.getDiningHalls();
+        const dataMap = new Map<string, DiningHall>();
+        apiHalls.forEach(h => dataMap.set(h.slug, h));
+        setDiningHallsData(dataMap);
+      } catch {
+        // API also failed — chips will render dimmed (no data)
+      }
+      setDiningHalls(fallbackSlugs);
     }
   };
   loadDiningHalls();
