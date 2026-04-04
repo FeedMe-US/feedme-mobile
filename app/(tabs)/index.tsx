@@ -18,7 +18,7 @@ import { Text } from '@/src/ui/Text';
 import { Button } from '@/src/ui/Button';
 import { haptics } from '@/src/utils/haptics';
 import { formatMacro } from '@/src/utils/formatNutrition';
-import { getCurrentOrNextMealPeriod } from '@/src/utils/mealPeriodUtils';
+// getCurrentOrNextMealPeriod removed — is_open_now is the single source of truth
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
@@ -86,18 +86,13 @@ export default function HomeScreen() {
     if (!selectedMealPeriod) return;
     if (selectedHallMode === 'specific' && !selectedHallSlug) return;
 
-    // For a specific hall, use the hall's current or next meal period rather than
-    // the device-clock period. This handles "between periods" correctly: if it's
-    // 3:45 PM (frontend says "lunch") but dinner opens at 5 PM, we recommend for
-    // "dinner" — not "lunch" — because the hall only has dinner items today.
-    // A null effectiveMealPeriod means the hall has no meal service today → closed.
+    // is_open_now is the single source of truth. If the hall isn't open,
+    // show the closed card immediately — don't call the backend.
     let effectiveMealPeriod = selectedMealPeriod;
     if (selectedHallMode === 'specific' && selectedHallSlug) {
       const hallData = diningHallsData.get(selectedHallSlug);
-      const hallMealPeriod = hallData ? getCurrentOrNextMealPeriod(hallData) : null;
 
-      if (!hallMealPeriod) {
-        // Hall has no meal period today (e.g. Sunday closure, or past midnight)
+      if (!hallData?.is_open_now) {
         const hallName = hallData?.name || selectedHallSlug
           .split('-')
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -114,7 +109,10 @@ export default function HomeScreen() {
         haptics.light();
         return;
       }
-      effectiveMealPeriod = hallMealPeriod;
+      // Hall is open — use its current_meal for the recommendation
+      if (hallData.current_meal) {
+        effectiveMealPeriod = hallData.current_meal as MealPeriod;
+      }
     }
 
     // Build cache key for this hall + period combination
@@ -335,18 +333,19 @@ useFocusEffect(
         }
       });
 
-      // Sort: halls with a meal today first, then closed halls. MRU within each group.
+      // Sort: open halls first, closed halls second. MRU within each group.
+      // is_open_now is the single source of truth — matches menu page logic.
       let mruOrder: string[] = [];
       try { mruOrder = await getMRUOrder(); } catch { /* ignore */ }
       console.log('[Home] Loaded MRU order:', mruOrder);
 
-      const hallsWithMeal = preferredHalls.filter(h => !!h.current_meal || !!h.next_meal);
-      const hallsWithoutMeal = preferredHalls.filter(h => !h.current_meal && !h.next_meal);
+      const openHalls = preferredHalls.filter(h => !!h.is_open_now);
+      const closedHalls = preferredHalls.filter(h => !h.is_open_now);
       const openSlugs = sortByMRU(
-        Array.from(new Set(hallsWithMeal.map(h => h.slug))), mruOrder
+        Array.from(new Set(openHalls.map(h => h.slug))), mruOrder
       );
       const closedSlugs = sortByMRU(
-        Array.from(new Set(hallsWithoutMeal.map(h => h.slug))), mruOrder
+        Array.from(new Set(closedHalls.map(h => h.slug))), mruOrder
       );
       let hallSlugs = [...openSlugs, ...closedSlugs];
 
@@ -661,13 +660,12 @@ useFocusEffect(
                   .join(' ');
                 // Remove "Closed" suffix if present
                 hallName = hallName.replace(/\s*\(?Closed\)?/gi, '').trim();
-                // Dim the chip only when the hall has no meal service today at all
-                // (current_meal is null). If current_meal is set — even for an
-                // upcoming period — the chip is fully visible so users know they
-                // can tap it for a recommendation.
+                // is_open_now is the single source of truth from the backend:
+                // true only when items exist for the current meal period AND
+                // current time is within scraped hours.
                 const hallData = diningHallsData.get(hallSlug);
-                const hasMealToday = !!hallData?.current_meal || !!hallData?.next_meal;
-                const chipStyle = hasMealToday
+                const isOpen = !!hallData?.is_open_now;
+                const chipStyle = isOpen
                   ? styles.diningHallChip
                   : { ...styles.diningHallChip, opacity: 0.6 };
                 return (
