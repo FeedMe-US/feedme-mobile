@@ -216,14 +216,16 @@ export default function HomeScreen() {
     }
   }, [params, router]);
 
-  // Set current meal period on mount (but don't auto-select a hall)
+  // Set current meal period on mount — always ensure a meal period is set when
+  // halls are loaded, even if a last-selected hall was restored (which sets
+  // isInitialized early).  Without this, handleGenerate returns early because
+  // selectedMealPeriod is null, and no card (closed or open) renders.
   useEffect(() => {
-    if (!isInitialized && diningHalls.length > 0 && params.buildPlate !== 'true' && !selectedHallSlug) {
+    if (diningHalls.length > 0 && !selectedMealPeriod && params.buildPlate !== 'true') {
       const currentPeriod = getCurrentMealPeriod();
       setSelectedMealPeriod(currentPeriod);
-      // Don't set isInitialized here - only set it when a hall is actually selected
     }
-  }, [diningHalls.length, isInitialized, getCurrentMealPeriod, params.buildPlate, selectedHallSlug]);
+  }, [diningHalls.length, selectedMealPeriod, getCurrentMealPeriod, params.buildPlate]);
 
   // Auto-generate recommendation when hall or meal period changes (but not mood)
   useEffect(() => {
