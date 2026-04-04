@@ -264,44 +264,39 @@ useFocusEffect(
   useCallback(() => {
     const loadDiningHalls = async () => {
     try {
-      // Get all dining halls from the API
+      // ── Step 1: Get API data and IMMEDIATELY set it as chip data ──
+      // This ensures chips always have open/closed status even if
+      // everything below (profile, preferences, sorting) fails.
       const allHalls = await mealService.getDiningHalls();
       console.log('[Home] Loaded', allHalls.length, 'dining halls from API');
 
-      // Get preferred halls from backend (if authenticated) or local onboarding data
+      const apiDataMap = new Map<string, DiningHall>();
+      allHalls.forEach(h => apiDataMap.set(h.slug, h));
+      // Set data map early so chips are never blank
+      setDiningHallsData(apiDataMap);
+
+      // ── Step 2: Determine preferred halls (optional — failures safe) ──
       let preferredSlugs: string[] = [];
-      
+
       try {
-        // Try to get from backend first if authenticated
         const profile = await userService.getProfile();
         if (profile?.preferred_locations?.length) {
-          // Map location IDs to slugs
           const locationIdToSlug: Record<number, string> = {
-            // Residential dining
-            28: 'de-neve-dining',
-            29: 'bruin-plate',
-            30: 'spice-kitchen',
-            31: 'epicuria-at-covel',
-            // Hill / campus restaurants
-            34: 'bruin-cafe',
-            36: 'cafe-1919',
-            37: 'the-study-at-hedrick',
-            38: 'the-drey',
-            39: 'rendezvous',
+            28: 'de-neve-dining', 29: 'bruin-plate', 30: 'spice-kitchen',
+            31: 'epicuria-at-covel', 34: 'bruin-cafe', 36: 'cafe-1919',
+            37: 'the-study-at-hedrick', 38: 'the-drey', 39: 'rendezvous',
             41: 'epicuria-at-ackerman',
           };
           preferredSlugs = profile.preferred_locations
             .map(id => locationIdToSlug[id])
             .filter(slug => slug !== undefined);
         }
-        
-        // Fall back to local onboarding data if no backend data
         if (preferredSlugs.length === 0) {
           const onboardingData = await getOnboardingData();
           preferredSlugs = onboardingData.preferredDiningLocations || [];
         }
       } catch (error) {
-        console.warn('[Home] Error loading preferred halls, using local data:', error);
+        console.warn('[Home] Error loading preferred halls:', error);
         try {
           const onboardingData = await getOnboardingData();
           preferredSlugs = onboardingData.preferredDiningLocations || [];
@@ -310,7 +305,7 @@ useFocusEffect(
         }
       }
 
-      // Normalize slugs (map b-plate to bruin-plate, etc.)
+      // Normalize slugs
       preferredSlugs = preferredSlugs.map(slug => {
         if (slug === 'b-plate') return 'bruin-plate';
         if (slug === 'de-neve') return 'de-neve-dining';
@@ -319,71 +314,32 @@ useFocusEffect(
         if (slug === 'feast') return 'spice-kitchen';
         return slug;
       });
-
-      // Deduplicate preferred slugs after normalization to avoid duplicates
       preferredSlugs = Array.from(new Set(preferredSlugs));
 
-      // If no preferred halls could be determined, show all halls
+      // If no preferred halls, show all from API
       if (preferredSlugs.length === 0) {
         preferredSlugs = allHalls.map(h => h.slug);
       }
 
-      // Create a complete mapping of all possible dining halls (fallback data)
-      const allPossibleHalls: DiningHall[] = [
-        // Residential dining
-        { id: 29, name: 'BPlate', slug: 'bruin-plate', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false },
-        { id: 28, name: 'De Neve Dining', slug: 'de-neve-dining', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false },
-        { id: 31, name: 'Epicuria at Covel', slug: 'epicuria-at-covel', type: 'residential', is_residential: true, campus_area: 'Hill', is_open_now: false },
-        { id: 30, name: 'Feast at Rieber', slug: 'spice-kitchen', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
-        // Hill / campus restaurants
-        { id: 39, name: 'Rendezvous', slug: 'rendezvous', type: 'boutique', is_residential: false, campus_area: 'South', is_open_now: false },
-        { id: 37, name: 'The Study at Hedrick', slug: 'the-study-at-hedrick', type: 'boutique', is_residential: false, campus_area: 'Central', is_open_now: false },
-        { id: 38, name: 'The Drey', slug: 'the-drey', type: 'boutique', is_residential: false, campus_area: 'North', is_open_now: false },
-        { id: 34, name: 'BCafe', slug: 'bruin-cafe', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
-        { id: 36, name: 'Cafe 1919', slug: 'cafe-1919', type: 'boutique', is_residential: false, campus_area: 'Hill', is_open_now: false },
-        { id: 41, name: 'Epicuria at Ackerman', slug: 'epicuria-at-ackerman', type: 'boutique', is_residential: false, campus_area: 'Central', is_open_now: false },
-      ];
-
-      // Merge API data with fallback data (API data takes precedence for open status)
-      const hallsMap = new Map<string, DiningHall>();
-      allPossibleHalls.forEach(hall => hallsMap.set(hall.slug, { ...hall }));
-      allHalls.forEach(hall => {
-        const existing = hallsMap.get(hall.slug);
-        if (existing) {
-          // Update with API data (especially is_open_now)
-          hallsMap.set(hall.slug, { ...existing, ...hall });
-        } else {
-          // Add new hall from API
-          hallsMap.set(hall.slug, hall);
-        }
-      });
-      const mergedHalls = Array.from(hallsMap.values());
-
-      // Get preferred halls (even if closed) - use merged data to ensure all preferred halls are included
+      // ── Step 3: Build chip list using API data directly ──
+      // Look up each preferred hall from the API data map (already has
+      // is_open_now, current_meal, next_meal, hours_today, etc.)
       const preferredHalls = preferredSlugs
-        .map(slug => mergedHalls.find(h => h.slug === slug))
+        .map(slug => apiDataMap.get(slug))
         .filter((hall): hall is DiningHall => hall !== undefined);
-      
-      // If a preferred hall is missing, create a fallback entry
+
+      // If a preferred slug wasn't in the API, add a minimal fallback
       preferredSlugs.forEach(slug => {
         if (!preferredHalls.find(h => h.slug === slug)) {
-          const fallbackHall = allPossibleHalls.find(h => h.slug === slug);
-          if (fallbackHall) {
-            preferredHalls.push(fallbackHall);
-          }
+          preferredHalls.push({ id: 0, name: slug, slug, is_open_now: false } as DiningHall);
         }
       });
 
-      // Get MRU order from storage
-      const mruOrder = await getMRUOrder();
+      // Sort: halls with a meal today first, then closed halls. MRU within each group.
+      let mruOrder: string[] = [];
+      try { mruOrder = await getMRUOrder(); } catch { /* ignore */ }
       console.log('[Home] Loaded MRU order:', mruOrder);
 
-      // Sort chips: halls with a meal today (open or opening later) come first,
-      // halls with no meal service today come last. Within each group, apply MRU
-      // order so the most recently tapped hall stays at the front.
-      // current_meal is set by the API whenever a hall has an active or upcoming
-      // meal period today (falls back from current → next meal), so it's the right
-      // signal here rather than is_open_now (which is false between periods).
       const hallsWithMeal = preferredHalls.filter(h => !!h.current_meal || !!h.next_meal);
       const hallsWithoutMeal = preferredHalls.filter(h => !h.current_meal && !h.next_meal);
       const openSlugs = sortByMRU(
@@ -394,40 +350,23 @@ useFocusEffect(
       );
       let hallSlugs = [...openSlugs, ...closedSlugs];
 
-      // Store full DiningHall objects keyed by slug for fast lookup
-      const hallsDataMap = new Map<string, DiningHall>();
-
-      // First, populate from mergedHalls (has API data with is_open_now, next_meal_time, etc.)
-      mergedHalls.forEach(hall => {
-        hallsDataMap.set(hall.slug, hall);
-      });
-
-      // Then, ensure all preferred halls (including fallbacks) are in the map
-      // This handles cases where a preferred hall wasn't in the API response
-      preferredHalls.forEach(hall => {
-        if (!hallsDataMap.has(hall.slug)) {
-          hallsDataMap.set(hall.slug, hall);
-        }
-      });
-
-      setDiningHallsData(hallsDataMap);
-
       setDiningHalls(hallSlugs);
 
-      // Load last selected hall (if exists and is in preferred list)
-      const lastSelected = await getLastSelectedHall();
-      if (lastSelected && hallSlugs.includes(lastSelected)) {
-        console.log('[Home] Restoring last selected hall:', lastSelected);
-        setSelectedHallMode('specific');
-        setSelectedHallSlug(lastSelected);
-        setIsInitialized(true);
-      } else {
-        console.log('[Home] No valid last selected hall, waiting for user selection');
-        // Don't auto-select anything - user must explicitly choose
-      }
+      // Load last selected hall
+      try {
+        const lastSelected = await getLastSelectedHall();
+        if (lastSelected && hallSlugs.includes(lastSelected)) {
+          console.log('[Home] Restoring last selected hall:', lastSelected);
+          setSelectedHallMode('specific');
+          setSelectedHallSlug(lastSelected);
+          setIsInitialized(true);
+        } else {
+          console.log('[Home] No valid last selected hall, waiting for user selection');
+        }
+      } catch { /* ignore storage errors */ }
     } catch (error) {
-      console.error('Error loading dining halls:', error);
-      // Fallback — still try to get API data for open/closed status
+      console.error('[Home] Error loading dining halls:', error);
+      // Last resort — show all halls, try to get API data for status
       const fallbackSlugs = [
         'bruin-plate', 'de-neve-dining', 'epicuria-at-covel',
         'spice-kitchen', 'rendezvous', 'the-study-at-hedrick',
@@ -438,9 +377,7 @@ useFocusEffect(
         const dataMap = new Map<string, DiningHall>();
         apiHalls.forEach(h => dataMap.set(h.slug, h));
         setDiningHallsData(dataMap);
-      } catch {
-        // API also failed — chips will render dimmed (no data)
-      }
+      } catch { /* chips will render dimmed */ }
       setDiningHalls(fallbackSlugs);
     }
   };
