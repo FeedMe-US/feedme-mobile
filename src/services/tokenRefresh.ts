@@ -18,10 +18,11 @@ let refreshPromise: Promise<string | null> | null = null;
 export const TOKEN_EXPIRED_CODES = ['AUTH_TOKEN_EXPIRED'] as const;
 
 /**
- * Check if an error response indicates an expired token
+ * Check if an error response indicates an auth failure that should trigger refresh.
+ * Any 401 means the token is missing, expired, or invalid — always try refreshing.
  */
-export function isTokenExpiredError(status: number, errorCode?: string): boolean {
-  return status === 401 && errorCode === 'AUTH_TOKEN_EXPIRED';
+export function isTokenExpiredError(status: number, _errorCode?: string): boolean {
+  return status === 401;
 }
 
 /**

@@ -585,12 +585,6 @@ class MealService {
     // Ensure API client is initialized with auth token
     await apiClient.waitForInit();
 
-    // Check if user is authenticated - /recommend requires auth
-    if (!apiClient.hasAuthToken()) {
-      console.log('[MealService] No auth token available, returning closed response');
-      return this.getClosedResponse(hallSlug || 'default');
-    }
-
     // For "specific" mode, get the hall ID
     let locationId: number | null = null;
     let hallName: string | undefined;
