@@ -13,7 +13,12 @@ export type DiningLocationSlug =
   | 'rendezvous'
   | 'the-study-at-hedrick'
   | 'the-drey'
-  | 'epicuria-at-ackerman';
+  | 'epicuria-at-ackerman'
+  | 'northern-lights'
+  | 'epazote'
+  | 'burger-assembly'
+  | 'fusion'
+  | 'all-rise-pizza';
 
 export interface DiningLocation {
   slug: DiningLocationSlug;
@@ -35,6 +40,12 @@ export const DINING_LOCATIONS: DiningLocation[] = [
   { slug: 'the-study-at-hedrick', name: 'The Study at Hedrick', id: 37 },
   { slug: 'the-drey', name: 'The Drey', id: 38 },
   { slug: 'epicuria-at-ackerman', name: 'Epicuria at Ackerman', id: 41 },
+  // ASUCLA campus restaurants
+  { slug: 'northern-lights', name: 'Northern Lights', id: 100 },
+  { slug: 'epazote', name: 'Epazote', id: 102 },
+  { slug: 'burger-assembly', name: 'Burger Assembly', id: 103 },
+  { slug: 'fusion', name: 'Fusion', id: 104 },
+  { slug: 'all-rise-pizza', name: 'All Rise Pizza', id: 105 },
 ];
 
 /** Slug → display name (includes legacy slug aliases). */
