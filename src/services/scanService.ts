@@ -170,14 +170,10 @@ export const scanService = {
    */
   async lookupBarcode(barcode: string): Promise<BarcodeLookupResponse> {
     try {
-      const authToken = await getAuthToken();
-
-      const response = await fetch(`${API_BASE_URL}/scan/barcode/${barcode}`, {
+      // Use v2 endpoint which queries Open Food Facts directly
+      const response = await fetch(`${API_BASE_URL}/v2/food/barcode/${barcode}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const data = await response.json();
@@ -185,13 +181,35 @@ export const scanService = {
       if (!response.ok) {
         isScanApiAvailable = false;
         lastScanError = new Error(data.detail || 'Failed to lookup barcode');
-        console.warn('[scanService] API error, using mock data');
+        console.warn('[scanService] Barcode API error, using mock data');
         return this.getMockBarcodeLookup(barcode);
       }
 
       isScanApiAvailable = true;
       lastScanError = null;
-      return data as BarcodeLookupResponse;
+
+      // Map v2 response shape to BarcodeLookupResponse
+      const food = data.food;
+      if (!food) {
+        return { success: false, error: 'Product not found' };
+      }
+
+      return {
+        success: true,
+        product: {
+          barcode,
+          name: food.name,
+          brand: food.brand,
+          serving_size: food.serving_size,
+          calories: food.calories,
+          protein_g: food.protein_g,
+          carbs_g: food.carbs_g,
+          fat_g: food.fat_g,
+          fiber_g: food.fiber_g,
+          sugar_g: food.sugar_g,
+          sodium_mg: food.sodium_mg,
+        },
+      };
     } catch (error) {
       console.error('Barcode lookup error:', error);
       isScanApiAvailable = false;

@@ -230,36 +230,48 @@ export default function ManualLogScreen() {
           ))}
         </View>
 
-        {/* Search Input */}
+        {/* Search Input + Scan Button */}
         <View style={styles.searchContainer}>
-          <TextInput
-            ref={searchInputRef}
-            style={[
-              styles.searchInput,
-              {
-                backgroundColor: themeColors.cardBackground,
-                color: themeColors.text,
-                borderColor: themeColors.border,
-              },
-            ]}
-            placeholder="Search foods..."
-            placeholderTextColor={themeColors.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onFocus={() => {
-              setIsSearchFocused(true);
-            }}
-            onBlur={() => {
-              // Delay to allow tap events on results
-              setTimeout(() => setIsSearchFocused(false), 200);
-            }}
-            returnKeyType="search"
-            blurOnSubmit={true}
-            onSubmitEditing={() => {
-              searchInputRef.current?.blur();
-              Keyboard.dismiss();
-            }}
-          />
+          <View style={styles.searchRow}>
+            <TextInput
+              ref={searchInputRef}
+              style={[
+                styles.searchInput,
+                {
+                  backgroundColor: themeColors.cardBackground,
+                  color: themeColors.text,
+                  borderColor: themeColors.border,
+                  flex: 1,
+                },
+              ]}
+              placeholder="Search foods..."
+              placeholderTextColor={themeColors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onFocus={() => {
+                setIsSearchFocused(true);
+              }}
+              onBlur={() => {
+                // Delay to allow tap events on results
+                setTimeout(() => setIsSearchFocused(false), 200);
+              }}
+              returnKeyType="search"
+              blurOnSubmit={true}
+              onSubmitEditing={() => {
+                searchInputRef.current?.blur();
+                Keyboard.dismiss();
+              }}
+            />
+            <TouchableOpacity
+              style={[styles.scanButton, { backgroundColor: themeColors.primary }]}
+              onPress={() => {
+                haptics.light();
+                router.push({ pathname: '/camera', params: { mode: 'barcode' } });
+              }}
+              activeOpacity={0.7}>
+              <AppIcon type="barcode" size={22} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Results */}
@@ -595,12 +607,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   searchInput: {
     height: 48,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     borderWidth: 1,
     fontSize: 16,
+  },
+  scanButton: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   resultsContainer: {
     flex: 1,
