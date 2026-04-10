@@ -108,6 +108,13 @@ const HALL_ZONES: Record<number, CampusZone> = {
 
   // Central Campus
   41: 'central',      // Epicuria at Ackerman
+
+  // ASUCLA Campus Restaurants
+  100: 'north',       // Northern Lights (near Rolfe Hall)
+  102: 'central',     // Epazote (LuValle Commons)
+  103: 'central',     // Burger Assembly (LuValle Commons)
+  104: 'central',     // Fusion (LuValle Commons)
+  105: 'central',     // All Rise Pizza (LuValle Commons)
 };
 
 // =============================================================================
