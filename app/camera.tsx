@@ -3,8 +3,8 @@
  * Mode: 'photo' for AI meal analysis, 'barcode' for product scanning
  */
 
-import React, { useState, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Alert, Animated } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import {
   CameraView,
@@ -12,7 +12,7 @@ import {
   useCameraPermissions,
   BarcodeScanningResult,
 } from 'expo-camera';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { colors, spacing, radius } from '@/src/theme';
 import { Screen } from '@/src/ui/Screen';
@@ -43,7 +43,14 @@ export default function CameraScreen() {
   const [isScanning, setIsScanning] = useState(true); // For barcode mode
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
-  const scanLineAnim = useRef(new Animated.Value(0)).current;
+
+  // Reset scan state when screen regains focus (e.g., user navigates back from results)
+  useFocusEffect(
+    useCallback(() => {
+      setScannedBarcode(null);
+      setIsScanning(true);
+    }, [])
+  );
 
   if (!permission) {
     return <View />;

@@ -4,7 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from './api';
+import { apiClient, API_BASE_URL } from './api';
 
 const AUTH_TOKEN_KEY = '@FeedMe:authToken';
 
@@ -58,35 +58,23 @@ export interface BarcodeLookupResponse {
   error?: string;
 }
 
-/**
- * Get authentication token from storage
- */
-async function getAuthToken(): Promise<string | null> {
-  try {
-    return await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Extract error message from API response
- */
-function extractErrorMessage(data: unknown, statusCode: number): string {
-  if (typeof data === 'string') return data;
-  if (data && typeof data === 'object') {
-    const d = data as Record<string, unknown>;
-    // Handle nested detail: { detail: { detail: "...", code: "..." } }
-    if (d.detail && typeof d.detail === 'object') {
-      const inner = d.detail as Record<string, unknown>;
-      if (inner.detail) return String(inner.detail);
-    }
-    // Handle simple detail: { detail: "..." }
-    if (d.detail && typeof d.detail === 'string') return d.detail;
-    // Handle error field
-    if (d.error && typeof d.error === 'string') return d.error;
-  }
-  return `Request failed (HTTP ${statusCode})`;
+// Response shape from the v2 barcode endpoint
+interface V2BarcodeResponse {
+  success: boolean;
+  food?: {
+    id: string;
+    name: string;
+    brand?: string | null;
+    serving_size: string;
+    calories: number | null;
+    protein_g: number | null;
+    carbs_g: number | null;
+    fat_g: number | null;
+    fiber_g?: number | null;
+    sugar_g?: number | null;
+    sodium_mg?: number | null;
+    source: string;
+  };
 }
 
 export const scanService = {
@@ -98,7 +86,8 @@ export const scanService = {
    */
   async analyzePhoto(photoUri: string): Promise<FoodAIResponse> {
     try {
-      const authToken = await getAuthToken();
+      // Photo upload requires raw fetch for FormData — apiClient doesn't support multipart
+      const authToken = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
 
       if (!authToken) {
         console.warn('[scanService] No auth token - user not logged in');
@@ -109,7 +98,6 @@ export const scanService = {
         };
       }
 
-      // Create form data for file upload
       const formData = new FormData();
       formData.append('file', {
         uri: photoUri,
@@ -117,33 +105,22 @@ export const scanService = {
         name: 'food_photo.jpg',
       } as unknown as Blob);
 
-      console.log('[scanService] API_BASE_URL:', API_BASE_URL);
-      console.log('[scanService] Sending photo to:', `${API_BASE_URL}/scan/photo`);
-
-      // Use fetch directly for multipart upload
       const response = await fetch(`${API_BASE_URL}/scan/photo`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${authToken}`,
-          // Don't set Content-Type - fetch will set it with boundary for multipart
         },
         body: formData,
       });
 
       const data = await response.json();
-      console.log('[scanService] Response status:', response.status, 'ok:', response.ok);
-      console.log('[scanService] Response data:', JSON.stringify(data));
 
       if (!response.ok) {
-        const errorMsg = extractErrorMessage(data, response.status);
+        const errorMsg = data?.detail || data?.error || `Request failed (HTTP ${response.status})`;
         console.error('[scanService] API error:', response.status, errorMsg);
         isScanApiAvailable = false;
         lastScanError = new Error(errorMsg);
-        return {
-          success: false,
-          items: [],
-          error: errorMsg,
-        };
+        return { success: false, items: [], error: errorMsg };
       }
 
       isScanApiAvailable = true;
@@ -154,42 +131,33 @@ export const scanService = {
       console.error('[scanService] Photo analysis exception:', error);
       isScanApiAvailable = false;
       lastScanError = error instanceof Error ? error : new Error(errorMsg);
-      return {
-        success: false,
-        items: [],
-        error: errorMsg,
-      };
+      return { success: false, items: [], error: errorMsg };
     }
   },
 
   /**
-   * Lookup product by barcode
-   *
-   * @param barcode - UPC/EAN barcode string
-   * @returns BarcodeLookupResponse with product details
+   * Lookup product by barcode via the v2 endpoint (Open Food Facts).
+   * Uses apiClient for consistent auth headers and error handling.
+   * On failure, returns { success: false } — never fake data.
    */
   async lookupBarcode(barcode: string): Promise<BarcodeLookupResponse> {
     try {
-      // Use v2 endpoint which queries Open Food Facts directly
-      const response = await fetch(`${API_BASE_URL}/v2/food/barcode/${barcode}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const response = await apiClient.get<V2BarcodeResponse>(
+        `/v2/food/barcode/${barcode}`
+      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
+      if (response.error || !response.data?.success) {
+        const errorMsg = response.error || 'Product not found';
+        console.warn('[scanService] Barcode lookup failed:', errorMsg);
         isScanApiAvailable = false;
-        lastScanError = new Error(data.detail || 'Failed to lookup barcode');
-        console.warn('[scanService] Barcode API error, using mock data');
-        return this.getMockBarcodeLookup(barcode);
+        lastScanError = new Error(errorMsg);
+        return { success: false, error: errorMsg };
       }
 
       isScanApiAvailable = true;
       lastScanError = null;
 
-      // Map v2 response shape to BarcodeLookupResponse
-      const food = data.food;
+      const food = response.data.food;
       if (!food) {
         return { success: false, error: 'Product not found' };
       }
@@ -199,74 +167,52 @@ export const scanService = {
         product: {
           barcode,
           name: food.name,
-          brand: food.brand,
+          brand: food.brand ?? undefined,
           serving_size: food.serving_size,
-          calories: food.calories,
-          protein_g: food.protein_g,
-          carbs_g: food.carbs_g,
-          fat_g: food.fat_g,
-          fiber_g: food.fiber_g,
-          sugar_g: food.sugar_g,
-          sodium_mg: food.sodium_mg,
+          calories: food.calories ?? 0,
+          protein_g: food.protein_g ?? 0,
+          carbs_g: food.carbs_g ?? 0,
+          fat_g: food.fat_g ?? 0,
+          fiber_g: food.fiber_g ?? undefined,
+          sugar_g: food.sugar_g ?? undefined,
+          sodium_mg: food.sodium_mg ?? undefined,
         },
       };
     } catch (error) {
-      console.error('Barcode lookup error:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to lookup barcode';
+      console.error('[scanService] Barcode lookup error:', error);
       isScanApiAvailable = false;
-      lastScanError = error instanceof Error ? error : new Error('Failed to lookup barcode');
-      console.warn('[scanService] Network error, using mock data');
-      return this.getMockBarcodeLookup(barcode);
+      lastScanError = error instanceof Error ? error : new Error(errorMsg);
+      return { success: false, error: errorMsg };
     }
   },
 
   /**
-   * Mock photo analysis for development/testing
-   * Returns realistic mock data when API is unavailable
+   * Mock photo analysis — dev-only helper for testing without backend.
    */
   getMockPhotoAnalysis(): FoodAIResponse {
     return {
       success: true,
       items: [
-        {
-          name: 'Grilled Chicken Breast',
-          calories: 165,
-          protein_g: 31,
-          carbs_g: 0,
-          fat_g: 3.6,
-          confidence: 0.92,
-          serving_size: '4 oz',
-        },
-        {
-          name: 'Brown Rice',
-          calories: 216,
-          protein_g: 5,
-          carbs_g: 45,
-          fat_g: 1.8,
-          confidence: 0.88,
-          serving_size: '1 cup',
-        },
-        {
-          name: 'Steamed Broccoli',
-          calories: 55,
-          protein_g: 3.7,
-          carbs_g: 11,
-          fat_g: 0.6,
-          confidence: 0.85,
-          serving_size: '1 cup',
-        },
+        { name: 'Grilled Chicken Breast', calories: 165, protein_g: 31, carbs_g: 0, fat_g: 3.6, confidence: 0.92, serving_size: '4 oz' },
+        { name: 'Brown Rice', calories: 216, protein_g: 5, carbs_g: 45, fat_g: 1.8, confidence: 0.88, serving_size: '1 cup' },
+        { name: 'Steamed Broccoli', calories: 55, protein_g: 3.7, carbs_g: 11, fat_g: 0.6, confidence: 0.85, serving_size: '1 cup' },
       ],
-      photo_url: undefined,
     };
   },
 
   /**
-   * Mock barcode lookup for development/testing
+   * Mock barcode lookup — dev-only helper, gated behind __DEV__.
+   * Never called in the production lookup flow.
    */
   getMockBarcodeLookup(barcode: string): BarcodeLookupResponse {
+    if (!__DEV__) {
+      return { success: false, error: 'Mock data not available in production' };
+    }
     return {
       success: true,
       product: {
-        barcode: barcode,
+        barcode,
         name: 'Clif Bar - Chocolate Chip',
         brand: 'Clif Bar',
         serving_size: '1 bar (68g)',
@@ -277,7 +223,6 @@ export const scanService = {
         fiber_g: 5,
         sugar_g: 21,
         sodium_mg: 180,
-        image_url: undefined,
       },
     };
   },

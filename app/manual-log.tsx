@@ -268,8 +268,10 @@ export default function ManualLogScreen() {
                 haptics.light();
                 router.push({ pathname: '/camera', params: { mode: 'barcode' } });
               }}
-              activeOpacity={0.7}>
-              <AppIcon type="barcode" size={22} />
+              activeOpacity={0.7}
+              accessibilityLabel="Scan barcode"
+              accessibilityHint="Opens camera to scan a product barcode">
+              <AppIcon type="barcode" size={22} color={themeColors.textInverse} />
             </TouchableOpacity>
           </View>
         </View>

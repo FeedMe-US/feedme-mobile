@@ -116,7 +116,7 @@ interface FoodSearchResponse {
     fiber_g?: number;
     sugar_g?: number;
     sodium_mg?: number;
-    source?: string; // v2 only: "usda_foundation" | "open_food_facts" | "usda_branded"
+    source?: "usda_foundation" | "open_food_facts" | "usda_branded";
   }>;
   error?: string;
 }
