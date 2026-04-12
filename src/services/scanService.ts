@@ -116,7 +116,11 @@ export const scanService = {
       const data = await response.json();
 
       if (!response.ok) {
-        const errorMsg = data?.detail || data?.error || `Request failed (HTTP ${response.status})`;
+        const rawDetail = data?.detail;
+        const errorMsg =
+          typeof rawDetail === 'string' ? rawDetail :
+          (rawDetail && typeof rawDetail === 'object' && typeof rawDetail.detail === 'string') ? rawDetail.detail :
+          data?.error || `Request failed (HTTP ${response.status})`;
         console.error('[scanService] API error:', response.status, errorMsg);
         isScanApiAvailable = false;
         lastScanError = new Error(errorMsg);
