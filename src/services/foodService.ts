@@ -208,7 +208,7 @@ export const foodService = {
     }
 
     // Fall back to v1 if v2 returns nothing or fails
-    return this.searchFoods(query);
+    return foodService.searchFoods(query);
   },
 
   /**
