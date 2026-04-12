@@ -101,8 +101,8 @@ async function fetchMenuItems(locationId: number): Promise<FoodItem[]> {
   return items;
 }
 
-// API response for USDA food search
-interface USDAFoodSearchResponse {
+// API response for food search (v1 USDA-only and v2 multi-source)
+interface FoodSearchResponse {
   success: boolean;
   foods: Array<{
     id: string;
@@ -116,9 +116,13 @@ interface USDAFoodSearchResponse {
     fiber_g?: number;
     sugar_g?: number;
     sodium_mg?: number;
+    source?: "usda_foundation" | "open_food_facts" | "usda_branded";
   }>;
   error?: string;
 }
+
+// Keep old name as alias for backward compatibility
+type USDAFoodSearchResponse = FoodSearchResponse;
 
 export const foodService = {
   /**
@@ -171,6 +175,39 @@ export const foodService = {
         food.name.toLowerCase().includes(lowerQuery) ||
         food.servingSize.toLowerCase().includes(lowerQuery)
     );
+  },
+
+  /**
+   * Search for foods using the v2 multi-source endpoint.
+   * Blends USDA Foundation, Open Food Facts, and USDA Branded results.
+   * Not yet wired to the UI — will replace searchFoods() in a future update.
+   */
+  async searchFoodsV2(query: string): Promise<FoodItem[]> {
+    if (!query || query.length < 2) {
+      return [];
+    }
+
+    try {
+      const response = await apiClient.get<FoodSearchResponse>(
+        `/v2/food/search?q=${encodeURIComponent(query)}&limit=20`
+      );
+
+      if (response.data?.success && response.data.foods.length > 0) {
+        return response.data.foods.map((food) => ({
+          id: food.id,
+          name: food.brand ? `${food.name} (${food.brand})` : food.name,
+          servingSize: food.serving_size,
+          calories: Math.round(food.calories),
+          protein: Math.round(food.protein_g),
+          carbs: Math.round(food.carbs_g),
+          fat: Math.round(food.fat_g),
+        }));
+      }
+    } catch (error) {
+      console.log('[foodService] v2 search failed:', error);
+    }
+
+    return [];
   },
 
   /**

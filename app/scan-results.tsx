@@ -32,7 +32,6 @@ import {
   BarcodeLookupResponse,
   getScanApiStatus,
 } from '@/src/services/scanService';
-import { logService } from '@/src/services/logService';
 
 // Route params
 type ScanResultsParams = {
@@ -236,14 +235,14 @@ export default function ScanResultsScreen() {
 
       const product = response.product;
 
-      // Convert to editable item
+      // Convert to editable item (null fallbacks for incomplete OFF data)
       const item: EditableFood = {
         id: `barcode-${code}`,
         name: product.name,
-        calories: product.calories,
-        protein: product.protein_g,
-        carbs: product.carbs_g,
-        fat: product.fat_g,
+        calories: product.calories ?? 0,
+        protein: product.protein_g ?? 0,
+        carbs: product.carbs_g ?? 0,
+        fat: product.fat_g ?? 0,
         servings: 1,
         servingSize: product.serving_size,
       };
@@ -274,7 +273,8 @@ export default function ScanResultsScreen() {
     setEditableItems((prev) => prev.filter((item) => item.id !== itemId));
   };
 
-  // Log meal
+  // Log meal — uses addMeal() only (which syncs to backend internally).
+  // Do NOT also call logService.logMeal() or the item gets double-logged.
   const handleLogMeal = async () => {
     if (editableItems.length === 0) {
       return;
@@ -285,23 +285,7 @@ export default function ScanResultsScreen() {
 
     const mealType = getMealType();
 
-    // Format items for API
-    const logItems = editableItems.map((item) => ({
-      name: item.name,
-      servings: item.servings,
-      calories: Math.round(item.calories * item.servings),
-      protein_g: Math.round(item.protein * item.servings),
-      carbs_g: Math.round(item.carbs * item.servings),
-      fat_g: Math.round(item.fat * item.servings),
-    }));
-
-    // Try to log to backend
-    // Backend source values: 'photo_ai' for photo scanning, 'barcode' for barcode
-    const source = mode === 'photo' ? 'photo_ai' : 'barcode';
-    await logService.logMeal(logItems, mealType, source);
-
-    // Update local tracking context
-    // Store per-serving nutrition values (not pre-multiplied by servings)
+    // Store per-serving nutrition values; addMeal multiplies by quantity internally
     editableItems.forEach((item) => {
       addMeal({
         name: item.name,
