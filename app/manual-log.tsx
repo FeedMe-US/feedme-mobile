@@ -103,7 +103,7 @@ export default function ManualLogScreen() {
   };
 
   const searchFoods = async () => {
-    const results = await foodService.searchFoods(searchQuery);
+    const results = await foodService.searchFoodsV2(searchQuery);
     setSearchResults(results);
   };
 
